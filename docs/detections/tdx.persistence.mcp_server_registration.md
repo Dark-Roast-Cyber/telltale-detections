@@ -1,0 +1,7 @@
+# `tdx.persistence.mcp_server_registration`
+
+This candidate detects `mcp add` commands for the supported client command names `codex`, `claude`, and `opencode`. It evaluates Rule v1 `command` and `arguments`. The client name may follow the start of the field, whitespace, or a quote: Codex's older `shell` tool (the lab's `compatible` profile) records `bash -lc '<command>'`, so a quote precedes the client name, while current Codex `exec_command` records a plain `cmd` string. Those fields prove that the agent requested a server-registration command; they do not attest to the server implementation, transport security, or whether the configuration write ultimately persisted.
+
+The bundled `mcp.server_enumeration` rule covers probing and repeated listing, while `mcp.tool_metadata.prompt_injection` covers injection text in MCP metadata or results. Neither detects a client command that registers a new server. This rule adds an observable signal for durable expansion of the agent's tool surface.
+
+Expected false positives include authorized developer setup and integration tests that register approved or synthetic MCP servers. The rule does not match read-only `mcp list` commands. It also does not cover direct JSON or TOML configuration edits, client aliases, graphical configuration, or registration performed through a tool whose searchable arguments omit the command. The command alone cannot determine whether the server is trustworthy or whether the user approved it.

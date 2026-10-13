@@ -1,0 +1,22 @@
+version: 1
+description: Provisional detection of MCP server registration commands in agent sessions.
+defaults:
+  case_insensitive: true
+  enabled: true
+rules:
+  - id: tdx.persistence.mcp_server_registration
+    title: MCP server registered by an agent command
+    category: persistence
+    detection_class: security_detection
+    signal_type: atomic
+    analytic_intent: alert
+    severity: medium
+    score: 40
+    targets: [command, arguments]
+    regex: '(^|[\s''"])(codex|claude|opencode)\s+mcp\s+add\b'
+    tags: [mcp, tool-surface, configuration, persistence]
+    explanation: An agent invokes a supported client command that registers a new MCP server and expands the tools available in later sessions.
+    falsepositives:
+      - Authorized developer setup may register an approved local or organizational MCP server.
+      - Integration tests may exercise an MCP add command against a synthetic server.
+modifiers: []
