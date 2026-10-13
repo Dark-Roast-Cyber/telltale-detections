@@ -25,6 +25,13 @@ bash scripts/linux-check.sh
 The script requires Telltale source at `2e8c56a`, builds its CLI with Cargo's
 target directory under `/tmp`, runs the lab and runner tests, validates every
 candidate rule, and analyzes every scenario in both Codex and OpenCode formats.
+The assessment explicitly selects the OpenCode `upstream` profile: v2.0.27
+`session_v2`/`session_message` history, rather than legacy `message`/`part`
+tables. Codex uses the `compatible` profile. Each summary row records the
+selected profile and generator version. At Telltale `2e8c56a`, OpenCode v2
+produces `not_evaluable` with reason `no_records_acquired`; the gate retains
+that acquisition gap as a finding. Legacy generator tests remain compatibility
+checks and do not determine the profile used for scenario assessments.
 It uses only the lab's `scenarios` and `analyze` commands. Scenario commands
 remain text inside generated session stores and are never executed.
 

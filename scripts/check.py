@@ -20,6 +20,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 FORMATS = ("codex.sessions", "opencode.sqlite")
+# Exercise OpenCode v2 history rather than the legacy tables Telltale can read.
+# Codex retains its compatibility profile for this OpenCode-specific change.
+GENERATION_PROFILES = {"codex.sessions": "compatible", "opencode.sqlite": "upstream"}
 EXPECTED_SOURCE = "2e8c56aa45583525e4536640adb2c977ba45d46b"
 EXPECTED_REVISION = EXPECTED_SOURCE[:12]
 
@@ -119,6 +122,7 @@ def check(args: argparse.Namespace) -> int:
         for source_id in FORMATS:
             case_out = out / "cases" / case_id / source_id
             command = [*lab_cmd, "analyze", "--scenario", str(path), "--format", source_id,
+                       "--profile", GENERATION_PROFILES[source_id],
                        "--event-schema", str(schema), "--out", str(case_out)]
             for rule in rules:
                 command.extend(["--rules", str(rule)])
@@ -136,6 +140,8 @@ def check(args: argparse.Namespace) -> int:
             counts[status] += 1
             rows.append({
                 "id": case_id, "scenario_sha256": sha256(path),
+                "generation_profile": report["generation"]["profile"],
+                "generator": report["generation"]["generator"],
                 "source_id": source_id, "disposition": data["disposition"],
                 "review_expectation": data["review"]["expectation"],
                 "status": status, "reason": report["evaluation"].get("reason"),

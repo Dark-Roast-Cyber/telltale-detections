@@ -83,7 +83,12 @@ modifiers: []
             self.assertTrue(summary["candidate_content_present"])
             matches = [row for row in summary["results"] if row["id"] == "test.marker"]
             self.assertEqual({row["source_id"] for row in matches}, {"codex.sessions", "opencode.sqlite"})
-            self.assertEqual([row["status"] for row in matches], ["detected", "detected"])
+            self.assertEqual([row["status"] for row in matches], ["detected", "not_evaluable"])
+            opencode_match = next(row for row in matches if row["source_id"] == "opencode.sqlite")
+            self.assertEqual(opencode_match["reason"], "no_records_acquired")
+            self.assertEqual(opencode_match["generation_profile"], "upstream")
+            self.assertEqual(opencode_match["generator"], "opencode-sqlite-v2.0.27/1")
+            self.assertTrue(summary["review_required"])
 
             # A missed expectation remains a finding in the report. It does not
             # cause the runner to relabel the independently authored scenario.
@@ -100,7 +105,8 @@ modifiers: []
             self.assertEqual(missed.returncode, 0, missed.stderr)
             missed_summary = json.loads((missed_out / "summary.json").read_text())
             self.assertTrue(missed_summary["review_required"])
-            self.assertEqual(missed_summary["counts"]["missed"], 2)
+            missed_rows = [row for row in missed_summary["results"] if row["id"] == "test.marker"]
+            self.assertEqual([row["status"] for row in missed_rows], ["missed", "not_evaluable"])
 
 
 if __name__ == "__main__":
