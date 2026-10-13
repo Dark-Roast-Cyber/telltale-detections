@@ -1,0 +1,22 @@
+version: 1
+description: Provisional detection of repository Git-hook persistence changes in agent sessions.
+defaults:
+  case_insensitive: true
+  enabled: true
+rules:
+  - id: tdx.persistence.git_hook_change
+    title: Git hook path or hook program changed by an agent
+    category: persistence
+    detection_class: security_detection
+    signal_type: atomic
+    analytic_intent: alert
+    severity: high
+    score: 50
+    targets: [command, arguments]
+    regex: '(git\s+config(?:\s+--(?:local|global|system))?\s+core\.hooksPath\s+\S+|(?s:(\.git[\\/]hooks[\\/][A-Za-z0-9._-]+.{0,400}#!|#!.{0,400}\.git[\\/]hooks[\\/][A-Za-z0-9._-]+)))'
+    tags: [git, hooks, persistence, repository]
+    explanation: An agent changes core.hooksPath or writes shebang-bearing content to a repository hook path, which can execute code during later Git operations.
+    falsepositives:
+      - Authorized repository setup may install versioned hooks or configure a team-approved hooks directory.
+      - Hook framework installation may create executable hook shims as part of an explicitly requested developer setup.
+modifiers: []
