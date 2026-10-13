@@ -13,6 +13,10 @@ if [[ "$(git -C "$TELLTALE_SOURCE" rev-parse HEAD)" != 2e8c56aa45583525e4536640a
 fi
 
 if [[ -n "${TELLTALE_BIN:-}" ]]; then
+  if [[ ! -x "$TELLTALE_BIN" ]]; then
+    echo "TELLTALE_BIN is not an executable file: $TELLTALE_BIN (unset it to build)" >&2
+    exit 2
+  fi
   BINARY="$TELLTALE_BIN"
 else
   TARGET_DIR="${TELLTALE_TARGET_DIR:-/tmp/telltale-daybreak-target}"
