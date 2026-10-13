@@ -1,0 +1,21 @@
+version: 1
+description: Provisional command-level Windows persistence detections for agent sessions.
+defaults:
+  case_insensitive: true
+  enabled: true
+rules:
+  - id: tdx.persistence.windows_agent_command
+    title: Windows persistence command in an agent tool call
+    category: persistence
+    detection_class: security_detection
+    signal_type: atomic
+    analytic_intent: alert
+    severity: high
+    score: 55
+    targets: [command, arguments]
+    regex: '(schtasks(?:\.exe)?\s+.{0,200}/create\b|reg(?:\.exe)?\s+add\s+.{0,240}(currentversion[\\/]+run(?:once)?\b|[\\/]+winlogon[\\/]+)|(?:copy|move|xcopy|robocopy)\s+.{0,240}(startup|start menu[\\/]+programs[\\/]+startup))'
+    tags: [windows, persistence, scheduled-task, run-key, startup-folder]
+    explanation: An agent tool call attempts a Windows scheduled-task, autorun-key, or startup-folder persistence change without requiring process parent-child telemetry.
+    falsepositives:
+      - Authorized endpoint administration may create scheduled tasks, configure approved autorun software, or install a requested startup shortcut.
+modifiers: []
