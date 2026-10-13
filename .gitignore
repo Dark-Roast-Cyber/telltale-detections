@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.env.*
+reports/
+
+# Local agent-tool state (never detection content)
+.claude/
+.mcp.json
