@@ -45,7 +45,7 @@ The runner fails on invalid scenarios or rules, missing inputs, Event 3 schema
 failures, or a synthetic secret leak. It records `missed`, `false_positive`, and
 `not_evaluable` as findings in `summary.json` with `review_required: true`; its
 zero exit means the assessment completed, not that detection quality passed.
-`candidate_content_present: false` means only the lab baseline was exercised.
+`candidate_content_present: false` means this repository contributed no experimental rule pack, no candidate scenario, or both. The run still analyzes every lab scenario found, and any candidate scenarios present.
 Labels come from the scenario file and are never rewritten from detector output.
 
 This is the local Linux CI entrypoint. A hosted workflow needs immutable refs
