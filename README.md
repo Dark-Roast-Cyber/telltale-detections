@@ -5,6 +5,10 @@ synthetic scenarios, and analyst notes. Daybreak's scope is in the sibling
 `telltale-lab/docs/daybreak-adversarial-scope.md`. Candidate IDs use `tdx.`;
 they are not bundled Telltale detections.
 
+- [Telltale](https://github.com/Dark-Roast-Cyber/telltale) owns bundled detections, telemetry, and the [documentation map](https://github.com/Dark-Roast-Cyber/telltale/blob/main/docs/README.md).
+- [Telltale evidence lab](https://github.com/Dark-Roast-Cyber/telltale-lab) generates and validates the synthetic scenarios.
+- [Agent Archaeology](https://agentarchaeology.ai/) explains the evidence and detection context.
+
 Expected content:
 
 ```text
