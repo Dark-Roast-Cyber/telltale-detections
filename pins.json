@@ -1,0 +1,10 @@
+{
+  "telltale": {
+    "repository": "https://github.com/Dark-Roast-Cyber/telltale",
+    "revision": "a0ddd240a5e6cc22832e16acdd0257a8dfefb899"
+  },
+  "telltale_lab": {
+    "repository": "https://github.com/Dark-Roast-Cyber/telltale-lab",
+    "revision": "be8610916b81bcd840dc79b1672d5dcd1e9e1c5c"
+  }
+}

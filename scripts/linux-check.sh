@@ -7,8 +7,9 @@ LAB_ROOT="${TELLTALE_LAB_ROOT:-$(cd "$DETECTIONS_ROOT/../telltale-lab" && pwd)}"
 TELLTALE_SOURCE="${TELLTALE_SOURCE:-$(cd "$DETECTIONS_ROOT/../telltale" && pwd)}"
 REPORT_ROOT="${1:-$(mktemp -d /tmp/telltale-daybreak-check.XXXXXX)}"
 
-if [[ "$(git -C "$TELLTALE_SOURCE" rev-parse HEAD)" != 2e8c56aa45583525e4536640adb2c977ba45d46b ]]; then
-  echo "Telltale source must be at 2e8c56aa45583525e4536640adb2c977ba45d46b" >&2
+EXPECTED_SOURCE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["telltale"]["revision"])' "$DETECTIONS_ROOT/pins.json")"
+if [[ "$(git -C "$TELLTALE_SOURCE" rev-parse HEAD)" != "$EXPECTED_SOURCE" ]]; then
+  echo "Telltale source must be at $EXPECTED_SOURCE (pins.json)" >&2
   exit 2
 fi
 
@@ -29,7 +30,9 @@ export TELLTALE_BIN="$BINARY"
 export TELLTALE_LAB_ROOT="$LAB_ROOT"
 export TELLTALE_SOURCE
 
-python3 -m unittest discover -s "$LAB_ROOT/tests" -v
+python3 "$DETECTIONS_ROOT/scripts/community_package.py" lint
+# The lab's own characterization tests run in the lab repository; this gate
+# uses only the lab's `scenarios` and `analyze` commands at the pinned revision.
 python3 -m unittest discover -s "$DETECTIONS_ROOT/tests" -v
 python3 "$DETECTIONS_ROOT/scripts/check.py" \
   --lab "$LAB_ROOT" --telltale "$BINARY" --telltale-source "$TELLTALE_SOURCE" \

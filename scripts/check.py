@@ -3,6 +3,8 @@
 
 Only the lab's `scenarios` and `analyze` commands are used. `analyze` generates
 source-native session records and invokes Telltale's read-only scan of them.
+Candidate packs at every maturity are installed together as the community rule
+package, replacing the snapshot embedded in the pinned Telltale.
 """
 
 from __future__ import annotations
@@ -11,11 +13,12 @@ import argparse
 import hashlib
 import json
 import os
-import re
 import subprocess
 import sys
 from collections import Counter
 from pathlib import Path
+
+import community_package
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,7 +26,9 @@ FORMATS = ("codex.sessions", "opencode.sqlite")
 # Exercise OpenCode v2 history rather than the legacy tables Telltale can read.
 # Codex retains its compatibility profile for this OpenCode-specific change.
 GENERATION_PROFILES = {"codex.sessions": "compatible", "opencode.sqlite": "upstream"}
-EXPECTED_SOURCE = "2e8c56aa45583525e4536640adb2c977ba45d46b"
+# pins.json is the single source for the Telltale and lab revisions under test.
+PINS = json.loads((ROOT / "pins.json").read_text(encoding="utf-8"))
+EXPECTED_SOURCE = PINS["telltale"]["revision"]
 EXPECTED_REVISION = EXPECTED_SOURCE[:12]
 
 
@@ -63,6 +68,20 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> subprocess.
         raise CheckError(f"command failed to start or timed out: {command[0]} ({type(exc).__name__})") from exc
 
 
+def git_revision(path: Path) -> str | None:
+    result = run(["git", "-C", str(path), "rev-parse", "HEAD"])
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def install_candidate_package(telltale: Path, config_dir: Path,
+                              rules: list[Path]) -> tuple[list[str], str | None]:
+    """Install the candidate packs as the community package; return lab config arguments."""
+    if not rules:
+        return [], None
+    path = community_package.install_candidate(ROOT, telltale, config_dir)
+    return ["--config-dir", str(config_dir)], sha256(path)
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -88,29 +107,30 @@ def check(args: argparse.Namespace) -> int:
     rev = run(["git", "-C", str(source), "rev-parse", "HEAD"])
     if rev.returncode or rev.stdout.strip() != EXPECTED_SOURCE:
         raise CheckError(f"Telltale source must be at {EXPECTED_SOURCE}")
-    version = run([str(telltale), "--version"])
-    if version.returncode or not re.search(rf"\({EXPECTED_REVISION}[0-9a-f]*\)", version.stdout):
-        raise CheckError(f"Telltale binary must report revision {EXPECTED_REVISION}")
+    version = community_package.require_pinned_telltale(ROOT, telltale)
+    lab_revision = git_revision(lab)
+    if lab_revision != PINS["telltale_lab"]["revision"]:
+        raise CheckError(f"lab checkout must be at {PINS['telltale_lab']['revision']} (pins.json)")
 
     lab_scenarios = require_dir(lab / "scenarios", "lab scenarios directory")
     candidate_scenarios = ROOT / "scenarios"
     cases = files_under(lab_scenarios, ".json") + files_under(candidate_scenarios, ".json")
     if not cases:
         raise CheckError("no scenarios found")
-    rules = files_under(ROOT / "packs" / "experimental", ".yaml")
+    rules = [path for _, path in community_package.pack_paths(ROOT)]
 
     out.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
     env["PYTHONPATH"] = str(lab / "src")
     env["TELLTALE_LAB_CONFIG"] = str(out / "absent-lab-config.json")
-    lab_cmd = [sys.executable, "-m", "evidence_lab", "--scenario-dir", str(candidate_scenarios)]
+    # Name the binary explicitly: otherwise the lab falls back to TELLTALE_BIN,
+    # its config, or PATH, which need not be the revision validated above.
+    lab_cmd = [sys.executable, "-m", "evidence_lab", "--telltale", str(telltale),
+               "--scenario-dir", str(candidate_scenarios)]
     validated = run([*lab_cmd, "scenarios"], env=env)
     if validated.returncode:
         raise CheckError(f"scenario validation failed: {validated.stderr.strip()[-2000:]}")
-    for rule in rules:
-        result = run([str(telltale), "rules", "validate", "--no-local-config", "--rules", str(rule)])
-        if result.returncode:
-            raise CheckError(f"rule validation failed for {rule.name}: {result.stderr.strip()[-2000:]}")
+    config_args, package_sha256 = install_candidate_package(telltale, out / "telltale-config", rules)
 
     rows = []
     counts: Counter[str] = Counter()
@@ -123,14 +143,15 @@ def check(args: argparse.Namespace) -> int:
             case_out = out / "cases" / case_id / source_id
             command = [*lab_cmd, "analyze", "--scenario", str(path), "--format", source_id,
                        "--profile", GENERATION_PROFILES[source_id],
-                       "--event-schema", str(schema), "--out", str(case_out)]
-            for rule in rules:
-                command.extend(["--rules", str(rule)])
+                       "--event-schema", str(schema), "--out", str(case_out), *config_args]
             result = run(command, env=env)
             if result.returncode:
                 raise CheckError(f"analysis failed for {case_id} {source_id}: {result.stderr.strip()[-2000:]}")
             report_path = case_out / "report.json"
             report = json.loads(require_file(report_path, "analysis report").read_text(encoding="utf-8"))
+            if not str(report["telltale"]["revision"]).startswith(EXPECTED_REVISION):
+                raise CheckError(f"analysis for {case_id} {source_id} used Telltale "
+                                 f"{report['telltale']['revision']}, not {EXPECTED_REVISION}")
             validation = report["event_validation"]
             if validation["structural_problems"] or validation["json_schema"] != "passed":
                 raise CheckError(f"Event 3 validation failed for {case_id} {source_id}")
@@ -155,8 +176,11 @@ def check(args: argparse.Namespace) -> int:
     summary = {
         "format": "telltale-detections/check/v1",
         "telltale_source": rev.stdout.strip(),
-        "telltale_version": version.stdout.strip(),
-        "rule_packs": [{"name": path.name, "sha256": sha256(path)} for path in rules],
+        "telltale_version": version,
+        "telltale_lab_revision": lab_revision,
+        "rule_packs": [{"name": path.relative_to(ROOT).as_posix(), "sha256": sha256(path)}
+                       for path in rules],
+        "candidate_package_sha256": package_sha256,
         "case_count": len(cases), "result_count": len(rows),
         "counts": dict(sorted(counts.items())),
         "review_required": bool(counts["missed"] or counts["false_positive"] or counts["not_evaluable"]),
@@ -178,7 +202,8 @@ def main() -> int:
     args = parser.parse_args()
     try:
         return check(args)
-    except (CheckError, ValueError, KeyError, json.JSONDecodeError) as exc:
+    except (CheckError, community_package.ContentError, ValueError, KeyError,
+            json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 

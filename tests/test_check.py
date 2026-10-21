@@ -68,7 +68,9 @@ modifiers: []
             (content / "scripts").mkdir(parents=True)
             (content / "scenarios" / "adversarial").mkdir(parents=True)
             (content / "packs" / "experimental").mkdir(parents=True)
-            shutil.copyfile(ROOT / "scripts" / "check.py", content / "scripts" / "check.py")
+            for name in ("scripts/check.py", "scripts/community_package.py",
+                         "pins.json", "community-package.json"):
+                shutil.copyfile(ROOT / name, content / name)
             (content / "scenarios" / "adversarial" / "test.marker.json").write_text(json.dumps(baseline))
             (content / "packs" / "experimental" / "marker.yaml").write_text(pack)
             out = Path(tmp) / "output"
@@ -81,11 +83,12 @@ modifiers: []
             self.assertEqual(result.returncode, 0, result.stderr)
             summary = json.loads((out / "summary.json").read_text())
             self.assertTrue(summary["candidate_content_present"])
+            self.assertRegex(summary["candidate_package_sha256"], r"^[0-9a-f]{64}$")
             matches = [row for row in summary["results"] if row["id"] == "test.marker"]
             self.assertEqual({row["source_id"] for row in matches}, {"codex.sessions", "opencode.sqlite"})
             self.assertEqual([row["status"] for row in matches], ["detected", "not_evaluable"])
             opencode_match = next(row for row in matches if row["source_id"] == "opencode.sqlite")
-            self.assertEqual(opencode_match["reason"], "no_records_acquired")
+            self.assertEqual(opencode_match["reason"], "acquisition_failed")
             self.assertEqual(opencode_match["generation_profile"], "upstream")
             self.assertEqual(opencode_match["generator"], "opencode-sqlite-v2.0.27/1")
             self.assertTrue(summary["review_required"])

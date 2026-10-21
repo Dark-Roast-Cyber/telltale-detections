@@ -1,11 +1,12 @@
 version: 1
-description: Provisional detection of MCP server registration commands in agent sessions.
+description: Community detection of MCP server registration commands in agent sessions.
 defaults:
   case_insensitive: true
   enabled: true
 rules:
   - id: tdx.persistence.mcp_server_registration
     title: MCP server registered by an agent command
+    status: test
     category: persistence
     detection_class: security_detection
     signal_type: atomic

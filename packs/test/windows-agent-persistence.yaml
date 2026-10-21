@@ -1,11 +1,12 @@
 version: 1
-description: Provisional command-level Windows persistence detections for agent sessions.
+description: Community command-level Windows persistence detections for agent sessions.
 defaults:
   case_insensitive: true
   enabled: true
 rules:
   - id: tdx.persistence.windows_agent_command
     title: Windows persistence command in an agent tool call
+    status: test
     category: persistence
     detection_class: security_detection
     signal_type: atomic
