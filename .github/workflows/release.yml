@@ -1,0 +1,145 @@
+name: Release
+
+# A `vX.Y.Z` tag on main publishes the telltale.community rule package, its
+# SHA256SUMS, and a build-provenance attestation as a GitHub Release. The build
+# job runs repository, lab, and Cargo code with read-only permissions; only the
+# publish job, which runs none of it, can write releases or request an OIDC token.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Assess, build, and validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: telltale-detections
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the tag names a version on main
+        id: version
+        working-directory: telltale-detections
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag ${GITHUB_REF_NAME} is not vMAJOR.MINOR.PATCH[-PRERELEASE]" >&2
+            exit 1
+          fi
+          git fetch --no-tags --force origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" refs/remotes/origin/main; then
+            echo "Tagged commit ${GITHUB_SHA} is not on main" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Contribution lint and unit tests
+        working-directory: telltale-detections
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: |
+          python3 scripts/community_package.py lint
+          python3 -m unittest discover -s tests -v
+      - name: Read pinned revisions
+        id: pins
+        run: |
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          pins = json.load(open("telltale-detections/pins.json"))
+          print(f"telltale={pins['telltale']['revision']}")
+          print(f"lab={pins['telltale_lab']['revision']}")
+          EOF
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Dark-Roast-Cyber/telltale
+          ref: ${{ steps.pins.outputs.telltale }}
+          path: telltale
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: Dark-Roast-Cyber/telltale-lab
+          ref: ${{ steps.pins.outputs.lab }}
+          path: telltale-lab
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: 1.95.0
+      - name: Build pinned Telltale
+        working-directory: telltale
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/telltale-target
+        run: cargo build --release --locked --bin telltale
+      - name: Assess candidate content
+        working-directory: telltale-detections
+        env:
+          TELLTALE_BIN: ${{ runner.temp }}/telltale-target/release/telltale
+        run: bash scripts/linux-check.sh "$RUNNER_TEMP/report"
+      - name: Build the community package
+        working-directory: telltale-detections
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 scripts/community_package.py build \
+            --version "$VERSION" --revision "${GITHUB_SHA}" --out "$RUNNER_TEMP/dist"
+      - name: Validate the package with pinned Telltale
+        env:
+          TELLTALE: ${{ runner.temp }}/telltale-target/release/telltale
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          config="$RUNNER_TEMP/telltale-config"
+          install -D -m 0644 "$RUNNER_TEMP"/dist/*.package.yaml "$config/rule-packages.d/telltale.community.yaml"
+          (cd "$RUNNER_TEMP/dist" && sha256sum --check SHA256SUMS)
+          "$TELLTALE" rules validate --config-dir "$config" | tee "$RUNNER_TEMP/package-validation.json"
+          python3 - "$RUNNER_TEMP/package-validation.json" "$VERSION" <<'EOF'
+          import json, sys
+          packages = json.load(open(sys.argv[1]))["packages"]
+          assert [(p["id"], p["version"], p["origin"]) for p in packages] == [
+              ("telltale.community", sys.argv[2], "installed")], packages
+          EOF
+      - name: Upload the package
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: community-package
+          path: ${{ runner.temp }}/dist
+          if-no-files-found: error
+
+  publish:
+    name: Attest and publish
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: community-package
+          path: ${{ runner.temp }}/dist
+      - name: Verify checksums
+        run: cd "$RUNNER_TEMP/dist" && sha256sum --check SHA256SUMS
+      - name: Attest the package
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/dist/*.package.yaml
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          overwrite_files: false
+          files: |
+            ${{ runner.temp }}/dist/*.package.yaml
+            ${{ runner.temp }}/dist/SHA256SUMS

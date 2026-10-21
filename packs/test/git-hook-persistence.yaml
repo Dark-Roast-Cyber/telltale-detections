@@ -1,11 +1,12 @@
 version: 1
-description: Provisional detection of repository Git-hook persistence changes in agent sessions.
+description: Community detection of repository Git-hook persistence changes in agent sessions.
 defaults:
   case_insensitive: true
   enabled: true
 rules:
   - id: tdx.persistence.git_hook_change
     title: Git hook path or hook program changed by an agent
+    status: test
     category: persistence
     detection_class: security_detection
     signal_type: atomic

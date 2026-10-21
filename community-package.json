@@ -1,0 +1,7 @@
+{
+  "id": "telltale.community",
+  "publisher": "Telltale community detections",
+  "license": "Apache-2.0",
+  "rule_namespace": "tdx",
+  "source": "https://github.com/Dark-Roast-Cyber/telltale-detections"
+}

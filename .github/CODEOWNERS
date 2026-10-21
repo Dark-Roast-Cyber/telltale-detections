@@ -1,0 +1,6 @@
+# Changes to the gate itself need a maintainer's review (CONTRIBUTING.md).
+/scripts/ @christian-taillon
+/tests/ @christian-taillon
+/.github/ @christian-taillon
+/pins.json @christian-taillon
+/community-package.json @christian-taillon

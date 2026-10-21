@@ -8,3 +8,4 @@ reports/
 # Local agent-tool state (never detection content)
 .claude/
 .mcp.json
+dist/
