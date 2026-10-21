@@ -59,10 +59,8 @@ also confirms that Telltale loads every candidate pack. The
 [full gate](README.md#linux-assessment) needs Telltale and lab checkouts at the
 revisions in `pins.json`.
 
-CI validates every pull request with the pinned Telltale. It runs the full gate
-and uploads `summary.json` for `main` and for branches in this repository. The
-lab is private, so fork pull requests show a warning instead, and a maintainer
-runs the full gate before merging them.
+CI runs the full gate on every pull request at the pinned revisions and uploads
+the assessment report, including `summary.json`.
 
 ## Maturity
 
@@ -77,8 +75,7 @@ runs the full gate before merging them.
 
 ## Review and CI
 
-CI runs with a read-only token. Fork pull requests receive no secrets; trusted
-runs read the lab with a read-only deploy key. Maintainers review false-positive
+CI runs with a read-only token and no secrets. Maintainers review false-positive
 risk, overlap with Telltale core rules, evasion notes, and score/severity.
 Changes to `scripts/`, `tests/`, `.github/`, `pins.json`, or
 `community-package.json` change the gate itself and need a maintainer's review

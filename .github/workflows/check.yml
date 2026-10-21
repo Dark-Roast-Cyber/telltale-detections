@@ -1,9 +1,7 @@
 name: Check
 
-# Contributions run with a read-only token. Fork pull requests receive no
-# secrets; trusted runs read the private lab with a read-only deploy key.
-# Scenario commands are data: the lab writes them into synthetic session stores
-# and never runs them.
+# Contributions run with a read-only token and no secrets. Scenario commands are
+# data: the lab writes them into synthetic session stores and never runs them.
 on:
   pull_request:
   push:
@@ -75,41 +73,21 @@ jobs:
       - name: Validate candidate packs with pinned Telltale
         working-directory: telltale-detections
         run: python3 scripts/community_package.py validate --telltale "$RUNNER_TEMP/telltale-target/release/telltale"
-      - name: Check lab access
-        id: lab
-        env:
-          LAB_DEPLOY_KEY: ${{ secrets.TELLTALE_LAB_DEPLOY_KEY }}
-          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
-          GIT_TERMINAL_PROMPT: "0"
-        run: |
-          if [ -n "$LAB_DEPLOY_KEY" ] || git ls-remote --exit-code https://github.com/Dark-Roast-Cyber/telltale-lab HEAD >/dev/null 2>&1; then
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          elif [ "$GITHUB_EVENT_NAME" = pull_request ] && [ "$HEAD_REPOSITORY" != "$GITHUB_REPOSITORY" ]; then
-            echo "::warning title=Lab assessment not run::Fork pull requests cannot read the private lab. A maintainer runs scripts/linux-check.sh before merge."
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::Set the TELLTALE_LAB_DEPLOY_KEY secret; the lab is not publicly readable."
-            exit 1
-          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        if: steps.lab.outputs.available == 'true'
         with:
           repository: Dark-Roast-Cyber/telltale-lab
           ref: ${{ steps.pins.outputs.lab }}
           path: telltale-lab
-          ssh-key: ${{ secrets.TELLTALE_LAB_DEPLOY_KEY }}
           persist-credentials: false
       - name: Assess candidate content
-        if: steps.lab.outputs.available == 'true'
         working-directory: telltale-detections
         env:
           TELLTALE_BIN: ${{ runner.temp }}/telltale-target/release/telltale
         run: bash scripts/linux-check.sh "$RUNNER_TEMP/report"
-      # Per-case reports hold generated lab sessions; publish only the summary.
-      - name: Upload assessment summary
-        if: always() && steps.lab.outputs.available == 'true'
+      - name: Upload assessment report
+        if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
-          name: assessment-summary
-          path: ${{ runner.temp }}/report/summary.json
+          name: assessment-report
+          path: ${{ runner.temp }}/report
           if-no-files-found: ignore

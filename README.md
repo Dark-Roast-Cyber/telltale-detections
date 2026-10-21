@@ -27,8 +27,6 @@ pinned assessment, a package of every `test` and `stable` pack, validation with
 the pinned Telltale, a build-provenance attestation, and a GitHub Release with
 `telltale.community-X.Y.Z.package.yaml` and `SHA256SUMS`. Telltale refreshes its
 embedded snapshot from a release with `scripts/dev/vendor-community-rules.py`.
-While the lab is private, releases and trusted CI runs read it with the
-`TELLTALE_LAB_DEPLOY_KEY` secret, a read-only deploy key on the lab repository.
 
 ## Use a release
 
