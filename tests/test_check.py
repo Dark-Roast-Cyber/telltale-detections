@@ -86,11 +86,11 @@ modifiers: []
             self.assertRegex(summary["candidate_package_sha256"], r"^[0-9a-f]{64}$")
             matches = [row for row in summary["results"] if row["id"] == "test.marker"]
             self.assertEqual({row["source_id"] for row in matches}, {"codex.sessions", "opencode.sqlite"})
-            self.assertEqual([row["status"] for row in matches], ["detected", "not_evaluable"])
+            self.assertEqual([row["status"] for row in matches], ["detected", "detected"])
+            self.assertEqual([row["reason"] for row in matches], [None, None])
             opencode_match = next(row for row in matches if row["source_id"] == "opencode.sqlite")
-            self.assertEqual(opencode_match["reason"], "acquisition_failed")
             self.assertEqual(opencode_match["generation_profile"], "upstream")
-            self.assertEqual(opencode_match["generator"], "opencode-sqlite-v2.0.27/1")
+            self.assertEqual(opencode_match["generator"], "opencode-sqlite-v2.0.27/2")
             self.assertTrue(summary["review_required"])
 
             # A missed expectation remains a finding in the report. It does not
@@ -109,7 +109,8 @@ modifiers: []
             missed_summary = json.loads((missed_out / "summary.json").read_text())
             self.assertTrue(missed_summary["review_required"])
             missed_rows = [row for row in missed_summary["results"] if row["id"] == "test.marker"]
-            self.assertEqual([row["status"] for row in missed_rows], ["missed", "not_evaluable"])
+            self.assertEqual([row["status"] for row in missed_rows], ["missed", "missed"])
+            self.assertEqual([row["reason"] for row in missed_rows], [None, None])
 
 
 if __name__ == "__main__":
