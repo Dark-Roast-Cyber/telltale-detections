@@ -36,14 +36,21 @@ class RulePatternTests(unittest.TestCase):
             "git config --get core.hooksPath",
             "git config --show-origin --get core.hooksPath",
             "git config --unset core.hooksPath",
+            "git config core.hooksPath || printf 'No hook path configured\\n'",
+            "git config core.hooksPath && printf 'Hook path configured\\n'",
+            "git config core.hooksPath > /workspace/demo/hook-path.txt",
+            "git config core.hooksPath # inspect the configured path",
+            "git config core.hooksPath\nprintf 'No write requested\\n'",
             "cat .git/hooks/pre-commit",
         )
         for command in positive:
             with self.subTest(command=command):
                 self.assertIsNotNone(rule.search(command))
+                self.assertIsNotNone(rule.search(json.dumps(["bash", "-lc", command])))
         for command in negative:
             with self.subTest(command=command):
                 self.assertIsNone(rule.search(command))
+                self.assertIsNone(rule.search(json.dumps(["bash", "-lc", command])))
 
     def test_mcp_registration(self) -> None:
         rule = pattern("mcp-server-registration.yaml")
