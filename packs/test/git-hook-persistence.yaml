@@ -14,10 +14,11 @@ rules:
     severity: high
     score: 50
     targets: [command, arguments]
-    regex: '(git\s+config(?:\s+--(?:local|global|system))?\s+core\.hooksPath\s+\S+|(?s:(\.git[\\/]hooks[\\/][A-Za-z0-9._-]+.{0,400}#!|#!.{0,400}\.git[\\/]hooks[\\/][A-Za-z0-9._-]+)))'
+    regex: '(git\s+config(?:\s+--(?:local|global|system|add|replace-all))*\s+core\.hooksPath\s+\S+|(?s:(\.git[\\/]hooks[\\/][A-Za-z0-9._-]+.{0,400}#!|#!.{0,400}\.git[\\/]hooks[\\/][A-Za-z0-9._-]+)))'
     tags: [git, hooks, persistence, repository]
-    explanation: An agent changes core.hooksPath or writes shebang-bearing content to a repository hook path, which can execute code during later Git operations.
+    explanation: An agent tool request contains a hook configuration pattern or nearby hook-path and shebang text; a write or later hook execution requires confirmation.
     falsepositives:
       - Authorized repository setup may install versioned hooks or configure a team-approved hooks directory.
       - Hook framework installation may create executable hook shims as part of an explicitly requested developer setup.
+      - Read-only shebang inspection and quoted hook examples can contain the same hook-path and shebang text.
 modifiers: []
