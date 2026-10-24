@@ -14,10 +14,11 @@ rules:
     severity: medium
     score: 40
     targets: [command, arguments]
-    regex: '(^|[\s''"])(codex|claude|opencode)\s+mcp\s+add\b'
+    regex: '(^|[\s''"])(codex|claude|opencode)\s+mcp\s+add(?:\s|\\?[''"]|$)'
     tags: [mcp, tool-surface, configuration, persistence]
-    explanation: An agent invokes a supported client command that registers a new MCP server and expands the tools available in later sessions.
+    explanation: An agent tool request contains a supported client MCP add entrypoint; successful registration and expansion of the tool surface require confirmation.
     falsepositives:
       - Authorized developer setup may register an approved local or organizational MCP server.
       - Integration tests may exercise an MCP add command against a synthetic server.
+      - MCP add help and quoted registration examples can match without changing configuration.
 modifiers: []

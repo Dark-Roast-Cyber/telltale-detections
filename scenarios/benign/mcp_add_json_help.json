@@ -1,0 +1,19 @@
+{
+  "format": "telltale-lab/scenario/v1",
+  "id": "detection.mcp_add_json_help",
+  "title": "Agent inspects MCP add-json help without registering a server",
+  "description": "The user requests CLI help for a different subcommand, not a registration.",
+  "disposition": "benign",
+  "review": {"expectation": "no_alert", "rationale": "Inspecting subcommand help does not register an MCP server."},
+  "expected_facts": ["The user asks for command help.", "The tool invokes add-json --help rather than add.", "No configuration change is requested."],
+  "visibility_limitations": ["The session does not independently inspect MCP configuration."],
+  "synthetic_resources": {"paths": [], "domains": []},
+  "permitted_operations": ["inspect MCP CLI help"],
+  "formats": ["codex.sessions", "opencode.sqlite"],
+  "session": {"start": "2026-02-02T10:11:00Z", "cwd": "/workspace/demo", "model": "synthetic-model", "provider": "synthetic-provider"},
+  "steps": [
+    {"type": "user", "text": "Show the add-json subcommand help without adding a server."},
+    {"type": "tool", "tool": "shell", "command": "opencode mcp add-json --help", "result": {"status": "ok", "exit_code": 0, "output": "Usage: opencode mcp add-json"}}
+  ],
+  "rule_expectations": {"must_match": [], "must_not_match": ["tdx.persistence.mcp_server_registration"]}
+}
