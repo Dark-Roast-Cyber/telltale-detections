@@ -14,9 +14,10 @@ rules:
     severity: high
     score: 55
     targets: [command, arguments]
-    regex: '(schtasks(?:\.exe)?\s+.{0,200}/create\b|reg(?:\.exe)?\s+add\s+.{0,240}(currentversion[\\/]+run(?:once)?\b|[\\/]+winlogon[\\/]+)|(?:copy|move|xcopy|robocopy)\s+.{0,240}(startup|start menu[\\/]+programs[\\/]+startup))'
+    regex: '(schtasks(?:\.exe)?\s+.{0,200}/create\b|reg(?:\.exe)?\s+add\s+(?:\\?["''])?(?:HKCU|HKLM|HKEY_CURRENT_USER|HKEY_LOCAL_MACHINE)[\\/]+Software[\\/]+Microsoft[\\/]+(?:Windows[\\/]+CurrentVersion[\\/]+Run(?:Once)?|Windows NT[\\/]+CurrentVersion[\\/]+Winlogon)(?:\\?["'']|\s|$)|(?:copy|move|xcopy|robocopy)\s+(?:/-?Y\s+){0,2}(?:\\?"[^"\r\n]{1,240}"|[^\s"/][^\s"]{0,239})\s+(?:\\?"[^"\r\n]{0,240}[\\/]+Startup(?:[\\/][^"\r\n]{0,240})?\\?"|[^\s"]{0,240}[\\/]+Startup(?:[\\/][^\s"]{0,240})?(?:\s|\\?"|$)))'
     tags: [windows, persistence, scheduled-task, run-key, startup-folder]
     explanation: An agent tool call attempts a Windows scheduled-task, autorun-key, or startup-folder persistence change without requiring process parent-child telemetry.
     falsepositives:
       - Authorized endpoint administration may create scheduled tasks, configure approved autorun software, or install a requested startup shortcut.
+      - Quoted command examples, arbitrary folders named Startup, and ordinary Winlogon settings can match without establishing persistence.
 modifiers: []
