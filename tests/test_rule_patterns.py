@@ -108,15 +108,24 @@ class RulePatternTests(unittest.TestCase):
             r"New-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce -Name Example -Value example.exe",
             r'Set-ItemProperty -Name Shell -Path "HKLM:\Software\Microsoft\Windows NT\CurrentVersion\Winlogon" -Value example.exe',
             r"Set-ItemProperty Registry::HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer\Run -Name Example -Value example.exe",
+            r"reg add HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnceEx\0001 /v 1 /t REG_SZ /d C:\Example\helper.exe /f",
+            r"New-ItemProperty -Path HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnceEx\0001 -Name 1 -Value C:\Example\helper.exe",
+            r"$action = New-ScheduledTaskAction -Execute C:\Example\helper.exe; Register-ScheduledTask -TaskName SyntheticUpdater -Action $action",
             r'Copy-Item C:\Example\helper.lnk "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\helper.lnk"',
             r"Copy-Item -Path C:\Example\helper.lnk -Destination 'C:\Users\Example\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup'",
+            r"Copy-Item -LiteralPath C:\Example\helper.lnk -Destination 'C:\Users\Example\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup'",
             r"(New-Object -ComObject Shell.Application).Namespace('shell:startup').CopyHere('C:\Example\helper.lnk')",
+            r"Copy-Item C:\Example\helper.lnk -Destination ((New-Object -ComObject Shell.Application).Namespace('shell:startup').Self.Path)",
         )
         negative = (
             "schtasks.exe /Query /TN SyntheticUpdater",
             "Get-ScheduledTask -TaskName SyntheticUpdater",
             "Unregister-ScheduledTask -TaskName SyntheticUpdater -Confirm:$false",
             "Get-Help Register-ScheduledTask -Examples",
+            "Get-Help Register-ScheduledTask -Full; Get-ScheduledTask -TaskName SyntheticUpdater",
+            "Get-Help Register-ScheduledTask -Full && Get-ScheduledTask -TaskName SyntheticUpdater",
+            r"reg query HKLM\Software\Microsoft\Windows\CurrentVersion\RunOnceEx\0001",
+            r"Copy-Item -Path ((New-Object -ComObject Shell.Application).Namespace('shell:startup').Self.Path) -Destination C:\Backup -Recurse",
             r"Get-ItemProperty -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'",
             r"Get-ItemProperty -Path 'HKLM:\Software\Microsoft\Windows NT\CurrentVersion\ProfileList\S-1-5-21-0' -Name ProfileImagePath",
             r"Remove-ItemProperty -Path HKCU:\Software\Microsoft\Windows\CurrentVersion\Run -Name Example",
@@ -146,6 +155,8 @@ class RulePatternTests(unittest.TestCase):
             r'sc.exe create SyntheticSvc binPath= "C:\Example\svc.exe" start= auto',
             r'sc.exe config SyntheticSvc binPath= "C:\Example\other.exe"',
             "sc config SyntheticSvc start= auto",
+            'sc.exe config SyntheticSvc start= "auto"',
+            r'& "$env:SystemRoot\System32\sc.exe" config SyntheticSvc start= auto',
             "Set-Service -Name SyntheticSvc -StartupType Automatic",
         )
         negative = (
@@ -155,6 +166,9 @@ class RulePatternTests(unittest.TestCase):
             "Get-Service -Name SyntheticSvc",
             "Set-Service -Name SyntheticSvc -StartupType Disabled",
             "Get-Help New-Service -Examples",
+            "Get-Help New-Service -Full; Get-Service -Name SyntheticSvc",
+            "Get-Help New-Service -Full && Get-Service -Name SyntheticSvc",
+            'sc.exe config SyntheticSvc start= "demand"',
             'rg -n "New-Service|sc create" docs/',
             'sc config.json "{}"',
         )
@@ -169,6 +183,8 @@ class RulePatternTests(unittest.TestCase):
             "echo 'Import-Module SyntheticTools' >> $PROFILE",
             r'Add-Content "$HOME\Documents\WindowsPowerShell\Microsoft.PowerShell_profile.ps1" "Import-Module SyntheticTools"',
             r"Copy-Item .\profile.ps1 $PROFILE",
+            r"Copy-Item -LiteralPath C:\Example\profile.ps1 -Destination $PROFILE",
+            r"Copy-Item -Destination $PROFILE -Path C:\Example\profile.ps1",
             "cp ./profile.ps1 ~/.config/powershell/Microsoft.PowerShell_profile.ps1",
         )
         negative = (
@@ -179,8 +195,11 @@ class RulePatternTests(unittest.TestCase):
             "New-Item -Path $PROFILE -ItemType File -Force",
             r"Copy-Item $PROFILE C:\Backup\profile.ps1",
             r"Copy-Item $PROFILE -Destination C:\Backup\profile.ps1",
+            'Copy-Item -Path $PROFILE -Destination "$PROFILE.bak"',
+            r'Copy-Item $PROFILE "C:\Users\Example\Documents\PowerShell\Microsoft.PowerShell_profile.ps1.bak"',
             r"Get-Content $PROFILE > C:\Backup\profile.txt",
             "Set-Content -Path notes.txt -Value $PROFILE",
+            "Get-Help Add-Content -Full; Get-Content -Path $PROFILE",
         )
         self.assert_windows_matches(rule, positive, negative)
 
@@ -192,12 +211,16 @@ class RulePatternTests(unittest.TestCase):
             r"Set-WmiInstance -Namespace root\subscription -Class __FilterToConsumerBinding -Arguments @{Filter=$filter; Consumer=$consumer}",
             r'wmic /NAMESPACE:"\\root\subscription" PATH __EventFilter CREATE Name="SyntheticFilter"',
             r'$consumer = ([wmiclass]"\\.\root\subscription:CommandLineEventConsumer").CreateInstance()',
+            r'wmic /NAMESPACE:"\\root\subscription" PATH "__EventFilter" CREATE Name="SyntheticFilter"',
+            r"New-CimInstance -Namespace root/subscription -Property @{Name='SyntheticFilter';QueryLanguage='WQL'} -ClassName __EventFilter",
         )
         negative = (
             r"Get-WmiObject -Namespace root\subscription -Class __EventFilter",
             "Get-CimInstance -Namespace root/subscription -ClassName __FilterToConsumerBinding",
             "Get-CimInstance -Namespace root/subscription -ClassName CommandLineEventConsumer | Remove-CimInstance",
             r'wmic /NAMESPACE:"\\root\subscription" PATH __EventFilter GET Name',
+            "Get-Help Set-WmiInstance -Full; Get-CimInstance -Namespace root/subscription -ClassName __EventFilter",
+            r"New-CimInstance -Namespace root/cimv2 -ClassName Win32_Environment -Property @{Name='__EventFilter';VariableValue='EXAMPLE'}",
             'rg -n "__EventFilter|CommandLineEventConsumer" docs/',
         )
         self.assert_windows_matches(rule, positive, negative)
