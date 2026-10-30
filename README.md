@@ -9,6 +9,7 @@ separate and are reviewed under its own content standard.
 ## Browse
 
 - [Rule packs](packs/) and [analyst notes](docs/detections/)
+- [MITRE ATLAS coverage](docs/atlas-coverage.md) of Telltale core and community rules
 - [Adversarial, benign, and visibility-limited scenarios](scenarios/)
 - [Assessment runner](scripts/check.py), [package builder and lint](scripts/community_package.py), and [tests](tests/)
 - [Contributing](CONTRIBUTING.md)
