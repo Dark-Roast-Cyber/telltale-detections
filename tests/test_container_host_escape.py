@@ -4,10 +4,12 @@ These checks do not replace pinned parser-to-event assessment.
 """
 import json
 import re
+import shlex
 import unittest
 from pathlib import Path
 
-PACK = Path(__file__).resolve().parents[1] / "packs/experimental/container-host-escape.yaml"
+ROOT = Path(__file__).resolve().parents[1]
+PACK = ROOT / "packs/experimental/container-host-escape.yaml"
 
 
 def pattern(rule_id: str) -> re.Pattern[str]:
@@ -22,16 +24,16 @@ class ContainerHostAccessTests(unittest.TestCase):
     def test_host_access_requests(self) -> None:
         rule = pattern("tdx.privilege_escalation.container_host_escape")
         positive = (
-            "docker exec helper sh -c 'mount -t virtiofs virtiofs0 /mnt/host'",
-            "docker run --rm -v /:/host:ro alpine ls /host",
+            "docker exec helper sh -c 'mkdir -p /root/mac-home && mount -t virtiofs virtiofs0 /root/mac-home'",
+            "docker run --rm -v /:/host:ro alpine:3.20 ls /host",
             "podman container create --mount type=bind,source=/,target=/host alpine",
-            "nsenter --target 1 --mount --uts --net --pid -- sh",
-            """curl --unix-socket /var/run/docker.sock -X POST -d '{"HostConfig":{"Binds":["/:/host"],"Privileged":true}}' http://localhost/containers/create""",
+            'nsenter --target 1 --mount --uts --net --pid -- sh -c "cat /etc/hostname"',
+            """curl -sfS --unix-socket /var/run/docker.sock -X POST -H 'Content-Type: application/json' http://localhost/containers/create -d '{"Image":"alpine:3.20","Cmd":["ls","/host"],"HostConfig":{"Binds":["/:/host:ro"],"Privileged":true,"PidMode":"host","NetworkMode":"host","IpcMode":"host"}}'""",
         )
         negative = (
             "docker run --rm -v /workspace:/work alpine true",
             "docker run --rm --privileged -v /workspace:/work alpine true",
-            "docker run -v /var/run/docker.sock:/var/run/docker.sock synthetic-helper true",
+            "docker run -d -v /var/run/docker.sock:/var/run/docker.sock -p 127.0.0.1:8080:8080 testcontainers/ryuk:latest",
             "curl --unix-socket /var/run/docker.sock http://localhost/containers/json",
             "rg -n 'mount -t virtiofs|--privileged|-v /:/host' docs/",
         )
@@ -41,10 +43,12 @@ class ContainerHostAccessTests(unittest.TestCase):
         rule = pattern("tdx.privilege_escalation.container_privileged_launch")
         positive = (
             "docker run --rm --privileged alpine true",
-            "docker run --pid=host alpine true",
+            "docker run --pid=host alpine:3.20 true",
+            'docker run --pid="host" alpine:3.20 true',
+            'docker run --pid=\\"host\\" alpine:3.20 true',
             "podman run --cap-add=SYS_ADMIN alpine true",
             "docker run --security-opt seccomp=unconfined alpine true",
-            "docker run -v /var/run/docker.sock:/var/run/docker.sock synthetic-helper true",
+            "docker run -d -v /var/run/docker.sock:/var/run/docker.sock -p 127.0.0.1:8080:8080 testcontainers/ryuk:latest",
             "curl --unix-socket /var/run/docker.sock http://localhost/containers/json",
         )
         negative = (
@@ -52,8 +56,64 @@ class ContainerHostAccessTests(unittest.TestCase):
             "docker run --rm -v /:/host:ro alpine ls /host",
             "rg -n 'mount -t virtiofs|--privileged|-v /:/host' docs/",
             "docker ps",
+            "docker run --pid=hostname alpine:3.20 true",
         )
         self.assert_cases(rule, positive, negative)
+
+
+    def test_published_scenario_primitives(self) -> None:
+        """Guard against drifting back to made-up images, APIs or incomplete commands."""
+        scenarios = ROOT / "scenarios"
+
+        def fixture(relative_path: str) -> dict:
+            return json.loads((scenarios / relative_path).read_text(encoding="utf-8"))
+
+        virtiofs = fixture("adversarial/docker_desktop_virtiofs_escape.json")
+        virtiofs_command = virtiofs["steps"][1]["command"]
+        self.assertIn("--privileged", virtiofs_command)
+        self.assertIn("source=\\"$(pwd)\\",target=/host-tmp", virtiofs_command)
+        self.assertLess(virtiofs_command.index("mkdir -p /root/mac-home"),
+                        virtiofs_command.index("mount -t virtiofs virtiofs0 /root/mac-home"))
+
+        api = fixture("adversarial/docker_api_privileged_create.json")
+        api_args = shlex.split(api["steps"][1]["command"])
+        self.assertIn("--unix-socket", api_args)
+        self.assertEqual(api_args[api_args.index("--unix-socket") + 1], "/var/run/docker.sock")
+        self.assertIn("http://localhost/containers/create", api_args)
+        self.assertIn("-d", api_args)
+        body = json.loads(api_args[api_args.index("-d") + 1])
+        self.assertEqual(body["Image"], "alpine:3.20")
+        self.assertEqual(body["Cmd"], ["ls", "/host"])
+        self.assertTrue(body["HostConfig"]["Privileged"])
+        self.assertIn("/: /host:ro".replace(" ", ""), body["HostConfig"]["Binds"])
+        self.assertEqual(body["HostConfig"]["PidMode"], "host")
+
+        root_bind = fixture("adversarial/docker_socket_host_root_mount.json")
+        self.assertIn("-v /:/host:ro alpine:3.20", root_bind["steps"][1]["command"])
+
+        ryuk = fixture("benign/testcontainers_socket_mount.json")
+        ryuk_command = ryuk["steps"][1]["command"]
+        self.assertIn("-v /var/run/docker.sock:/var/run/docker.sock", ryuk_command)
+        self.assertIn("testcontainers/ryuk:latest", ryuk_command)
+        self.assertIn("-p 127.0.0.1:8080:8080", ryuk_command)
+
+        compose = fixture("visibility-limited/compose_privileged_file_write.json")
+        compose_text = compose["steps"][1]["content"]
+        self.assertIn("privileged: true", compose_text)
+        self.assertIn("- /:/host", compose_text)
+
+    def test_official_host_monitoring_is_known_alert_false_positive(self) -> None:
+        """Prometheus's documented, authorized node_exporter launch also matches the alert."""
+        fixture = json.loads(
+            (ROOT / "scenarios/benign/node_exporter_host_monitoring.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(fixture["disposition"], "benign")
+        self.assertEqual(fixture["review"]["expectation"], "no_alert")
+        command = fixture["steps"][1]["command"]
+        self.assertIn("quay.io/prometheus/node-exporter:latest", command)
+        self.assertIn("-v \\"/:/host:ro,rslave\\"", command)
+        self.assertIsNotNone(pattern("tdx.privilege_escalation.container_host_escape").search(command))
+        self.assertIsNotNone(pattern("tdx.privilege_escalation.container_privileged_launch").search(command))
 
     def assert_cases(self, rule: re.Pattern[str], positive: tuple[str, ...], negative: tuple[str, ...]) -> None:
         for command in positive:
