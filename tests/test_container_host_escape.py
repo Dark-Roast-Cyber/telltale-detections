@@ -60,7 +60,6 @@ class ContainerHostAccessTests(unittest.TestCase):
         )
         self.assert_cases(rule, positive, negative)
 
-
     def test_published_scenario_primitives(self) -> None:
         """Guard against drifting back to made-up images, APIs or incomplete commands."""
         scenarios = ROOT / "scenarios"
@@ -71,7 +70,7 @@ class ContainerHostAccessTests(unittest.TestCase):
         virtiofs = fixture("adversarial/docker_desktop_virtiofs_escape.json")
         virtiofs_command = virtiofs["steps"][1]["command"]
         self.assertIn("--privileged", virtiofs_command)
-        self.assertIn("source=\\"$(pwd)\\",target=/host-tmp", virtiofs_command)
+        self.assertIn('source="$(pwd)",target=/host-tmp', virtiofs_command)
         self.assertLess(virtiofs_command.index("mkdir -p /root/mac-home"),
                         virtiofs_command.index("mount -t virtiofs virtiofs0 /root/mac-home"))
 
@@ -111,7 +110,7 @@ class ContainerHostAccessTests(unittest.TestCase):
         self.assertEqual(fixture["review"]["expectation"], "no_alert")
         command = fixture["steps"][1]["command"]
         self.assertIn("quay.io/prometheus/node-exporter:latest", command)
-        self.assertIn("-v \\"/:/host:ro,rslave\\"", command)
+        self.assertIn('-v "/:/host:ro,rslave"', command)
         self.assertIsNotNone(pattern("tdx.privilege_escalation.container_host_escape").search(command))
         self.assertIsNotNone(pattern("tdx.privilege_escalation.container_privileged_launch").search(command))
 
