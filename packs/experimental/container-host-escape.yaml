@@ -31,7 +31,7 @@ rules:
     severity: low
     score: 20
     targets: [command, arguments]
-    regex: '(?:\b(?:docker|podman|nerdctl)\b(?:\s+container)?\s+(?:run|create)\b(?:[^;&|\n]|\\\r?\n){0,600}?\s(?:--privileged\b|--pid(?:\s+|=)host\b|--cap-add(?:\s+|=)(?:cap_)?(?:sys_admin|all)\b|--security-opt(?:\s+|=)\\{0,7}[\"'']?(?:seccomp|apparmor)[=:]unconfined|(?:-v|--volume|--mount)(?:\s+|=)[^\s;&|]*docker\.sock)|\bcurl\b(?:[^;&|\n]|\\\r?\n){0,200}?--unix-socket(?:\s+|=)\\{0,7}[\"'']?[^\s;&|]*docker\.sock)'
+    regex: '(?:\b(?:docker|podman|nerdctl)\b(?:\s+container)?\s+(?:run|create)\b(?:[^;&|\n]|\\\r?\n){0,600}?\s(?:--privileged\b|--pid(?:\s+|=)\\{0,7}[\"'']?host\b|--cap-add(?:\s+|=)(?:cap_)?(?:sys_admin|all)\b|--security-opt(?:\s+|=)\\{0,7}[\"'']?(?:seccomp|apparmor)[=:]unconfined|(?:-v|--volume|--mount)(?:\s+|=)[^\s;&|]*docker\.sock)|\bcurl\b(?:[^;&|\n]|\\\r?\n){0,200}?--unix-socket(?:\s+|=)\\{0,7}[\"'']?[^\s;&|]*docker\.sock)'
     tags: [container, docker, privileged, docker-socket, privilege-escalation]
     explanation: An agent tool request specifies privileged container options, broad capabilities, relaxed confinement, a daemon-socket mount, or a curl request to the Docker socket. The command is a host-access prerequisite, not evidence that the container was created or that isolation was bypassed.
     falsepositives:
