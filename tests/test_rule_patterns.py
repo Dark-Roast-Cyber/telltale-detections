@@ -53,38 +53,45 @@ class RulePatternTests(unittest.TestCase):
 
     def test_mcp_registration(self) -> None:
         rule = pattern("mcp-server-registration.yaml")
-        for command in (
+        positive = (
             "codex mcp add helper --url http://127.0.0.1:65535/mcp",
-            "claude mcp add helper -- command",
+            'codex mcp add --url=http://127.0.0.1:65535/mcp "helper"',
+            'claude mcp add --transport http -H "X-Example: SYNTHETIC" helper http://127.0.0.1:65535/mcp',
+            'claude mcp add --scope project --client-secret "$SERVER_NAME" http://127.0.0.1:65535/mcp',
+            "claude mcp add helper -- example-server --help",
+            "codex mcp add --help; codex mcp add helper --url http://127.0.0.1:65535/mcp",
+            "claude mcp add --help && opencode mcp add",
             "opencode mcp add helper",
             "opencode mcp add",
-        ):
-            with self.subTest(command=command):
-                self.assertIsNotNone(rule.search(command))
-                self.assertIsNotNone(rule.search(json.dumps(["bash", "-lc", command])))
-        for command in (
+            "opencode mcp add | tee /tmp/example-mcp.log",
+        )
+        negative = (
             "codex mcp list",
             "claude mcp get helper",
             "opencode mcp add-json helper",
             "claude mcp add-json --help",
             "codex mcp addition",
-        ):
-            with self.subTest(command=command):
-                self.assertIsNone(rule.search(command))
-                self.assertIsNone(rule.search(json.dumps(["bash", "-lc", command])))
-
-    def test_known_read_only_false_positives_remain_visible(self) -> None:
-        cases = (
-            ("git-hook-persistence.yaml", "grep '#!' .git/hooks/pre-commit"),
-            ("mcp-server-registration.yaml", "claude mcp add --help"),
+            "claude mcp add --help",
+            "claude mcp add --transport http --help",
+            'claude mcp add "--help"',
+            "codex mcp add -h",
+            "opencode mcp add --help",
+            "opencode mcp add -h; printf 'Help shown'",
+            'opencode mcp add "--help"',
         )
-        for pack, command in cases:
-            with self.subTest(pack=pack, command=command):
-                # These benign commands match today; independently labeled scenarios
-                # must keep reporting the resulting false positives in the full gate.
-                rule = pattern(pack)
-                self.assertIsNotNone(rule.search(command))
-                self.assertIsNotNone(rule.search(json.dumps(["bash", "-lc", command])))
+        for commands, expected in ((positive, True), (negative, False)):
+            for command in commands:
+                for form in (command, json.dumps(["bash", "-lc", command]),
+                             json.dumps({"cmd": command})):
+                    with self.subTest(form=form):
+                        self.assertEqual(bool(rule.search(form)), expected)
+
+    def test_known_hook_read_false_positive_remains_visible(self) -> None:
+        # The independent benign scenario still reports this finding in the full gate.
+        rule = pattern("git-hook-persistence.yaml")
+        command = "grep '#!' .git/hooks/pre-commit"
+        self.assertIsNotNone(rule.search(command))
+        self.assertIsNotNone(rule.search(json.dumps(["bash", "-lc", command])))
 
     def test_windows_persistence(self) -> None:
         rule = pattern("windows-agent-persistence.yaml")

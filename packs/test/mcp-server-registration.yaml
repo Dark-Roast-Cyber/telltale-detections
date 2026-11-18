@@ -14,11 +14,11 @@ rules:
     severity: medium
     score: 40
     targets: [command, arguments]
-    regex: '(^|[\s''"])(codex|claude|opencode)\s+mcp\s+add(?:\s|\\?[''"]|$)'
+    regex: '(?:^|[\s''";&|])(?:(?:codex|claude|opencode)[ \t]+mcp[ \t]+add[ \t]+(?:(?:--client-secret|(?:--(?:bearer-token-env-var|callback-port|client-id|env|header|scope|transport|url)|-[Hest])(?:[ \t]+|=)(?:\\?[''"][^''"\r\n]*\\?[''"]|[^\s''";&|<>]+))[ \t]+)*(?:--[ \t]+)?(?:\\?[''"])?[a-z0-9_.$]|opencode[ \t]+mcp[ \t]+add[ \t]*(?:$|[;&|\r\n<>]|\\?[''"][ \t]*(?:$|[,;&|}\]\r\n<>])))'
     tags: [mcp, tool-surface, configuration, persistence]
-    explanation: An agent tool request contains a supported client MCP add entrypoint; successful registration and expansion of the tool surface require confirmation.
+    explanation: An agent tool request contains a named MCP add command or the bare OpenCode registration wizard; successful registration and expansion of the tool surface require confirmation.
     falsepositives:
       - Authorized developer setup may register an approved local or organizational MCP server.
       - Integration tests may exercise an MCP add command against a synthetic server.
-      - MCP add help and quoted registration examples can match without changing configuration.
+      - Help requested after a server name and quoted registration examples can match without changing configuration.
 modifiers: []
