@@ -12,6 +12,6 @@ This rule intentionally does not alert by itself. Common authorized behavior inc
 
 Compare the user's request with the command, daemon privileges, selected capabilities, mounts and follow-on actions. When the companion host-access alert matches, investigate whether multiple rule score contributions describe the same command. The synthetic benign socket-mount scenario is intentionally `no_alert` even though this hunt rule matches.
 
-Known gaps include non-curl Docker clients, TCP Docker API endpoints, Compose and Kubernetes manifests without a visible shell command, embedded scripts, aliases and indirect environment-variable expansion. Native file-write content is not guaranteed by Rule v1 `command`/`arguments` targets. No live Docker invocation is executed by test scenarios.
+Coverage is limited to direct container launch and socket commands visible in `command` and `arguments`. Other daemon clients and transports, orchestration manifests, and indirect command construction are out of scope. Native file-write content is not guaranteed by Rule v1 `command`/`arguments` targets. No live Docker invocation is executed by test scenarios.
 
 See [issue #7](https://github.com/Dark-Roast-Cyber/telltale-detections/issues/7) and the companion [host access alert](tdx.privilege_escalation.container_host_escape.md).

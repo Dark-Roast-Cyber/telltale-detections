@@ -19,6 +19,6 @@ The companion hunt rule identifies preconditions such as `--privileged` or a soc
 
 The independent scenarios include a published Docker Desktop virtiofs request, Linux host-root bind mount, a correctly shaped Docker API create request, the documented Testcontainers Ryuk daemon socket launch, a Prometheus host-monitoring false-positive case, and read-only documentation search. A native Compose file write is intentionally `not_evaluable` because `command` and `arguments` do not guarantee native write-content visibility.
 
-Known gaps: non-root host mounts (e.g. `/etc`), `docker compose` and Kubernetes manifest changes, Docker TCP endpoints or non-curl API clients, aliases/variables/heredocs, Windows Docker named pipes, and alternate `mount` operand ordering. No live escape or host filesystem operation is executed by the scenarios.
+Coverage is limited to the direct command forms listed above, as they appear in `command` and `arguments`. Other container orchestration paths, other daemon transports and clients, and indirect command construction are out of scope for this rule. No live escape or host filesystem operation is executed by the scenarios.
 
 See [fixture provenance](container-fixture-provenance.md) for source-to-command mapping and platform assumptions. See [issue #7](https://github.com/Dark-Roast-Cyber/telltale-detections/issues/7) for research, synthetic engine replay, and pinned-gate history.
