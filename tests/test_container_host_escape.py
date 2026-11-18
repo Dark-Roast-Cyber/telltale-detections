@@ -10,6 +10,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PACK = ROOT / "packs/experimental/container-host-escape.yaml"
+REMOTE = "docker-host.invalid"
 
 
 def pattern(rule_id: str) -> re.Pattern[str]:
@@ -114,15 +115,100 @@ class ContainerHostAccessTests(unittest.TestCase):
         self.assertIsNotNone(pattern("tdx.privilege_escalation.container_host_escape").search(command))
         self.assertIsNotNone(pattern("tdx.privilege_escalation.container_privileged_launch").search(command))
 
+    def test_remote_daemon_and_engine_api_host_access(self) -> None:
+        rule = pattern("tdx.privilege_escalation.container_host_escape")
+        positive = (
+            f"""curl -s -X POST -H 'Content-Type: application/json' http://{REMOTE}:2375/v1.45/containers/create -d '{{"Image":"alpine:3.20","Cmd":["ls","/host"],"HostConfig":{{"Binds":["/:/host:ro"],"Privileged":true}}}}'""",
+            f"""curl -sS --cacert ca.pem --cert cert.pem --key key.pem -X POST https://{REMOTE}:2376/containers/create -H 'Content-Type: application/json' -d '{{"Image":"alpine:3.20","HostConfig":{{"Privileged":true}}}}'""",
+            f"""curl -s -X POST 'http://{REMOTE}:8375/containers/create?name=probe' -H 'Content-Type: application/json' -d '{{"Image":"alpine:3.20","HostConfig":{{"Mounts":[{{"Type":"bind","Source":"/","Target":"/host"}}]}}}}'""",
+            f"""wget -qO- --header='Content-Type: application/json' --post-data='{{"Image":"alpine:3.20","HostConfig":{{"Binds":["/:/host"]}}}}' http://{REMOTE}:2375/containers/create""",
+            f"""python3 -c "import requests; print(requests.post('http://{REMOTE}:2375/containers/create', json={{'Image': 'alpine:3.20', 'HostConfig': {{'Privileged': True}}}}).status_code)\"""",
+            f"""powershell -NoProfile -Command "Invoke-RestMethod -Method Post -Uri http://{REMOTE}:2375/containers/create -ContentType application/json -Body '{{\\"Image\\":\\"alpine:3.20\\",\\"HostConfig\\":{{\\"Privileged\\":true}}}}'\"""",
+            """curl --unix-socket /var/run/docker.sock -X POST -H 'Content-Type: application/json' http://localhost/containers/create -d '{"Image":"alpine:3.20","HostConfig":{"Mounts":[{"Type":"bind","Source":"/","Target":"/host","ReadOnly":true}]}}'""",
+            f"docker -H tcp://{REMOTE}:2375 run --rm -v /:/host alpine:3.20 ls /host",
+            f"docker --tlsverify -H=tcp://{REMOTE}:2376 container create --mount type=bind,source=/,target=/host alpine:3.20",
+            "docker --context remote run --rm -v /:/host alpine:3.20 true",
+            "docker --log-level debug -c remote run -v /:/host alpine:3.20 true",
+            "podman --remote run --rm -v /:/host alpine:3.20 true",
+            "podman --connection=ci run --rm --volume=/:/host alpine:3.20 true",
+            "nerdctl --namespace k8s.io run --rm -v /:/host alpine:3.20 true",
+        )
+        negative = (
+            f"curl -s -o /dev/null -w '%{{http_code}}\\n' http://{REMOTE}:2375/version",
+            f"curl -s 'http://{REMOTE}:2375/containers/json?all=1'",
+            f"""curl -s -X POST -H 'Content-Type: application/json' http://{REMOTE}:2375/containers/create -d '{{"Image":"alpine:3.20","HostConfig":{{"Binds":["/workspace/demo:/work"],"Privileged":false}}}}'""",
+            """rg -n '"Privileged": true' docs/api/containers/create.md""",
+            "rg -n 'containers/create|Privileged|2375' docs/",
+            f"docker -H tcp://{REMOTE}:2375 ps",
+            f"docker -H tcp://{REMOTE}:2376 --tlsverify run --rm -v /workspace/demo:/work -w /work golang:1.23 go test ./...",
+            f"DOCKER_HOST=tcp://{REMOTE}:2375 docker run --rm -v /workspace/demo:/work alpine:3.20 true",
+            """kubectl run probe --image=alpine:3.20 --overrides='{"spec":{"containers":[{"name":"probe","image":"alpine:3.20","securityContext":{"privileged":true}}]}}'""",
+            """curl -s -X POST https://api.example/v1/jobs -d '{"privileged":false,"source":"/"}'""",
+            "docker-compose -f ci.yml run --rm tests",
+            f"curl -s http://{REMOTE}:2375/containers/json; rg -n '\"Privileged\": true' docs/",
+        )
+        self.assert_cases(rule, positive, negative)
+
+    def test_remote_daemon_privileged_prerequisites(self) -> None:
+        rule = pattern("tdx.privilege_escalation.container_privileged_launch")
+        positive = (
+            f"docker -H tcp://{REMOTE}:2375 run --rm --privileged alpine:3.20 true",
+            "podman --remote run --cap-add=SYS_ADMIN alpine:3.20 true",
+            "docker --context remote run --pid=host alpine:3.20 true",
+        )
+        negative = (
+            f"curl -s 'http://{REMOTE}:2375/containers/json?all=1'",
+            f"curl -s -o /dev/null -w '%{{http_code}}\\n' http://{REMOTE}:2375/version",
+            f"docker -H tcp://{REMOTE}:2375 run --rm -v /workspace/demo:/work alpine:3.20 true",
+        )
+        self.assert_cases(rule, positive, negative)
+
+    def test_remote_daemon_fixtures(self) -> None:
+        """Keep the remote-daemon fixtures on documented API fields and global options."""
+        def fixture(relative_path: str) -> dict:
+            return json.loads((ROOT / "scenarios" / relative_path).read_text(encoding="utf-8"))
+
+        api = fixture("adversarial/docker_tcp_api_privileged_create.json")
+        probe = shlex.split(api["steps"][1]["command"])
+        self.assertEqual(probe[-1], f"http://{REMOTE}:2375/version")
+        create = shlex.split(api["steps"][2]["command"])
+        self.assertIn(f"http://{REMOTE}:2375/v1.45/containers/create", create)
+        body = json.loads(create[create.index("-d") + 1])
+        self.assertEqual(body["Image"], "alpine:3.20")
+        self.assertTrue(body["HostConfig"]["Privileged"])
+        self.assertIn("/:/host:ro", body["HostConfig"]["Binds"])
+
+        remote = shlex.split(fixture("adversarial/docker_remote_daemon_host_root_run.json")["steps"][1]["command"])
+        self.assertEqual(remote[:4], ["docker", "-H", f"tcp://{REMOTE}:2376", "--tlsverify"])
+        self.assertEqual(remote[4], "run")
+        self.assertIn("/:/host:ro", remote)
+
+        listing = fixture("benign/docker_tcp_api_container_list.json")["steps"][1]["command"]
+        self.assertIn(f"http://{REMOTE}:2375/containers/json?all=1", listing)
+
+        workspace = shlex.split(fixture("benign/docker_remote_daemon_workspace_run.json")["steps"][1]["command"])
+        self.assertEqual(workspace[:5], ["docker", "-H", f"tcp://{REMOTE}:2376", "--tlsverify", "run"])
+        self.assertIn("/workspace/demo:/work", workspace)
+
     def assert_cases(self, rule: re.Pattern[str], positive: tuple[str, ...], negative: tuple[str, ...]) -> None:
         for command in positive:
-            for value in (command, json.dumps(["bash", "-lc", command]), json.dumps({"cmd": command})):
+            for value in serializations(command):
                 with self.subTest(pattern=rule.pattern, command=value):
                     self.assertIsNotNone(rule.search(value))
         for command in negative:
-            for value in (command, json.dumps(["bash", "-lc", command]), json.dumps({"cmd": command})):
+            for value in serializations(command):
                 with self.subTest(pattern=rule.pattern, command=value):
                     self.assertIsNone(rule.search(value))
+
+
+def serializations(command: str) -> tuple[str, ...]:
+    """Raw text, a bash -lc array, a {"cmd"} object, and a Codex {"command": [...]} object."""
+    return (
+        command,
+        json.dumps(["bash", "-lc", command]),
+        json.dumps({"cmd": command}),
+        json.dumps({"command": ["bash", "-lc", command], "workdir": "/workspace/demo"}),
+    )
 
 
 if __name__ == "__main__":

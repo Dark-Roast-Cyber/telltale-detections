@@ -1,6 +1,6 @@
 # `tdx.privilege_escalation.container_privileged_launch`
 
-This **experimental hunt** rule observes agent shell tool requests that start a container with `--privileged`, host PID mode, broad capabilities, relaxed confinement, or the Docker socket mounted; it also observes `curl --unix-socket ...docker.sock`. It is low severity, score 20, and targets Rule v1 `command` and `arguments`.
+This **experimental hunt** rule observes agent shell tool requests that start a container with `--privileged`, host PID mode, broad capabilities, relaxed confinement, or the Docker socket mounted. It covers local daemons and remote daemons selected with global options such as `-H`, `--context` or `podman --remote`. It also observes `curl --unix-socket ...docker.sock`. Engine API requests over TCP are deliberately not part of this hunt, so requested read-only queries stay below the alert threshold. The companion alert covers host-reaching TCP create requests. It is low severity, score 20, and targets Rule v1 `command` and `arguments`.
 
 ## Evidence and interpretation
 
