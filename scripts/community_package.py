@@ -389,19 +389,24 @@ def require_pinned_telltale(root: Path, telltale: Path) -> str:
     return version.stdout.strip()
 
 
-def install_candidate(root: Path, telltale: Path, config_dir: Path) -> Path:
-    """Install every candidate pack, at any maturity, as the community package.
+def install_candidate(root: Path, telltale: Path, config_dir: Path) -> tuple[Path, dict[str, str]]:
+    """Return the installed candidate package and the maturity of each loaded rule.
 
     A package with the community ID replaces the snapshot embedded in Telltale,
     so Telltale's package loader validates exactly the content under review.
-    Returns the installed package path.
     """
     metadata = load_metadata(root)
-    expected = {
-        str(definition["id"])
-        for maturity, pack in pack_paths(root)
-        for definition in pack_definitions(read_text(pack, MAX_PACK_BYTES), f"packs/{maturity}/{pack.name}")
-    }
+    maturities: dict[str, str] = {}
+    for maturity, pack in pack_paths(root):
+        label = f"packs/{maturity}/{pack.name}"
+        for definition in pack_definitions(read_text(pack, MAX_PACK_BYTES), label):
+            rule_id = str(definition["id"])
+            where = f"{label}:{definition['line']}"
+            if rule_id in maturities:
+                raise ContentError(f"{where}: duplicate candidate rule `{rule_id}`")
+            if definition["status"] != maturity:
+                raise ContentError(f"{where}: `{rule_id}` needs `status: {maturity}`")
+            maturities[rule_id] = maturity
     text = compose_package(root, CANDIDATE_VERSION, None, MATURITIES)
     packages = config_dir / "rule-packages.d"
     packages.mkdir(parents=True)
@@ -422,10 +427,11 @@ def install_candidate(root: Path, telltale: Path, config_dir: Path) -> Path:
     if active != [package]:
         raise ContentError(f"Telltale did not load the candidate package as the only package: {active}")
     # Compare with Telltale's own parse, so a rule the text lint could not see fails here.
+    expected = maturities.keys()
     if loaded != expected:
         raise ContentError("Telltale loaded different candidate definitions than the lint checked: "
                            f"unexpected {sorted(loaded - expected)}, missing {sorted(expected - loaded)}")
-    return path
+    return path, dict(sorted(maturities.items()))
 
 
 def validate(root: Path, telltale: Path) -> str:

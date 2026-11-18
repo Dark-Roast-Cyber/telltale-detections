@@ -74,12 +74,12 @@ def git_revision(path: Path) -> str | None:
 
 
 def install_candidate_package(telltale: Path, config_dir: Path,
-                              rules: list[Path]) -> tuple[list[str], str | None]:
-    """Install the candidate packs as the community package; return lab config arguments."""
+                              rules: list[Path]) -> tuple[list[str], str | None, dict[str, str]]:
+    """Return lab config arguments, the package digest, and per-rule maturity."""
     if not rules:
-        return [], None
-    path = community_package.install_candidate(ROOT, telltale, config_dir)
-    return ["--config-dir", str(config_dir)], sha256(path)
+        return [], None, {}
+    path, maturities = community_package.install_candidate(ROOT, telltale, config_dir)
+    return ["--config-dir", str(config_dir)], sha256(path), maturities
 
 
 def sha256(path: Path) -> str:
@@ -130,7 +130,9 @@ def check(args: argparse.Namespace) -> int:
     validated = run([*lab_cmd, "scenarios"], env=env)
     if validated.returncode:
         raise CheckError(f"scenario validation failed: {validated.stderr.strip()[-2000:]}")
-    config_args, package_sha256 = install_candidate_package(telltale, out / "telltale-config", rules)
+    config_args, package_sha256, rule_maturities = install_candidate_package(
+        telltale, out / "telltale-config", rules,
+    )
 
     rows = []
     counts: Counter[str] = Counter()
@@ -167,6 +169,7 @@ def check(args: argparse.Namespace) -> int:
                 "review_expectation": data["review"]["expectation"],
                 "status": status, "reason": report["evaluation"].get("reason"),
                 "review_result": report["evaluation"]["review"]["result"],
+                "observed_rule_ids": report["observed"]["rule_ids"],
                 "matched": report["evaluation"]["must_match"]["matched"],
                 "missing": report["evaluation"]["must_match"]["missing"],
                 "violations": report["evaluation"]["must_not_match"]["violations"],
@@ -181,6 +184,7 @@ def check(args: argparse.Namespace) -> int:
         "rule_packs": [{"name": path.relative_to(ROOT).as_posix(), "sha256": sha256(path)}
                        for path in rules],
         "candidate_package_sha256": package_sha256,
+        "rule_maturities": rule_maturities,
         "case_count": len(cases), "result_count": len(rows),
         "counts": dict(sorted(counts.items())),
         "review_required": bool(counts["missed"] or counts["false_positive"] or counts["not_evaluable"]),

@@ -53,6 +53,7 @@ defaults:
   enabled: true
 rules:
   - id: tdx.test.marker
+    status: experimental
     category: execution
     severity: low
     score: 15
@@ -68,11 +69,16 @@ modifiers: []
             (content / "scripts").mkdir(parents=True)
             (content / "scenarios" / "adversarial").mkdir(parents=True)
             (content / "packs" / "experimental").mkdir(parents=True)
+            (content / "packs" / "test").mkdir()
             for name in ("scripts/check.py", "scripts/community_package.py",
                          "pins.json", "community-package.json"):
                 shutil.copyfile(ROOT / name, content / name)
             (content / "scenarios" / "adversarial" / "test.marker.json").write_text(json.dumps(baseline))
             (content / "packs" / "experimental" / "marker.yaml").write_text(pack)
+            companion = pack.replace("tdx.test.marker", "tdx.test.companion").replace(
+                "status: experimental", "status: test"
+            )
+            (content / "packs" / "test" / "companion.yaml").write_text(companion)
             out = Path(tmp) / "output"
             result = subprocess.run(
                 [sys.executable, str(content / "scripts" / "check.py"),
@@ -84,8 +90,16 @@ modifiers: []
             summary = json.loads((out / "summary.json").read_text())
             self.assertTrue(summary["candidate_content_present"])
             self.assertRegex(summary["candidate_package_sha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual(summary["rule_maturities"], {
+                "tdx.test.companion": "test", "tdx.test.marker": "experimental",
+            })
             matches = [row for row in summary["results"] if row["id"] == "test.marker"]
             self.assertEqual({row["source_id"] for row in matches}, {"codex.sessions", "opencode.sqlite"})
+            for row in matches:
+                self.assertEqual(row["matched"], ["tdx.test.marker"])
+                self.assertIn("tdx.test.marker", row["observed_rule_ids"])
+                self.assertIn("tdx.test.companion", row["observed_rule_ids"])
+                self.assertIn("execution.shell", row["observed_rule_ids"])
             self.assertEqual([row["status"] for row in matches], ["detected", "detected"])
             self.assertEqual([row["reason"] for row in matches], [None, None])
             opencode_match = next(row for row in matches if row["source_id"] == "opencode.sqlite")
@@ -111,6 +125,10 @@ modifiers: []
             missed_rows = [row for row in missed_summary["results"] if row["id"] == "test.marker"]
             self.assertEqual([row["status"] for row in missed_rows], ["missed", "missed"])
             self.assertEqual([row["reason"] for row in missed_rows], [None, None])
+            self.assertEqual(missed_summary["rule_maturities"], summary["rule_maturities"])
+            for row in missed_rows:
+                self.assertNotIn("tdx.test.marker", row["observed_rule_ids"])
+                self.assertIn("tdx.test.companion", row["observed_rule_ids"])
 
 
 if __name__ == "__main__":

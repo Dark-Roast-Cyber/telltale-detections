@@ -18,9 +18,14 @@ separate and are reviewed under its own content standard.
 
 | Directory | Rule `status` | Released |
 | --- | --- | --- |
-| `packs/experimental/` | `experimental` | No; assessed in CI only |
+| `packs/experimental/` | `experimental` | No; evaluated by the synthetic assessment |
 | `packs/test/` | `test` | Yes; enabled by default in Telltale |
 | `packs/stable/` | `stable` | Yes; eligible for promotion to a Telltale core rule |
+
+`experimental` keeps a rule out of the release package. If an operator loads
+it manually, the status does not suppress scoring or alerts. See
+[Telltale's rule override instructions](https://github.com/Dark-Roast-Cyber/telltale/blob/main/docs/install.md#community-rules-and-rule-packages)
+for local disablement and score tuning.
 
 `main` is the release branch. Pushing a `vX.Y.Z` tag on `main` runs the
 [release workflow](.github/workflows/release.yml): contribution lint, tests, the
@@ -73,6 +78,12 @@ entrypoint also exposes checkout and target-directory overrides. Its optional
 first argument selects an empty report directory; otherwise it creates one under `/tmp`.
 
 Review `summary.json` and the per-case `report.json` files in that directory.
+The summary's `rule_maturities` maps each loaded candidate rule ID to
+`experimental`, `test`, or `stable`. Look up a row's `observed_rule_ids` in
+that map to identify experimental matches, including ones not named in the
+scenario expectations. Core rules are not in the map. This annotates the
+assessment only; it does not label whole events or change Event 3.
+
 The runner fails on invalid scenarios or rules, missing inputs, Event 3 schema
 failures, or a synthetic secret leak. It records `missed`, `false_positive`, and
 `not_evaluable` as findings in `summary.json` with `review_required: true`; its
