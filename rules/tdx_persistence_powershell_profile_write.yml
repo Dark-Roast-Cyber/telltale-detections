@@ -1,0 +1,33 @@
+title: PowerShell profile write in an agent tool call
+id: 6d883fcb-d577-4282-a35d-e1b5a57fac91
+name: tdx.persistence.powershell_profile_write
+taxonomy: telltale
+status: test
+description: 'Detects writes to a PowerShell profile requested through an agent tool call: a write cmdlet, a redirection, or a copy or move whose destination is $PROFILE, the $PSHOME profile, or a profile script under a WindowsPowerShell or PowerShell directory. The profile runs in every later PowerShell session of that user or host. A match proves the request, not the resulting file.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.persistence.powershell_profile_write.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-10-28
+modified: 2026-10-28
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '((?:\b(?:add-content|set-content|out-file|tee-object)\s+(?:[^|;&\r\n]{0,240}?-(?:literal|file)?path:?\s*)?|>>?\s*|\b(?:copy|move)-item\b[^|;&\r\n]{0,240}?\s-destination:?\s*|\b(?:copy-item|move-item|cp|copy|mv|move)\s+(?:-(?:literal)?path\s+)?(?:\\?["''][^"''\r\n]{1,240}["'']|[^\s"''-][^\s"'']{0,239})\s+)(?:\\?["''])?(?:\$profile(?:\.(?:all|current)users?(?:all|current)hosts?)?|(?:\$pshome|(?:\\?["''][^"''\r\n]{0,240}|[^\s"''|;]{0,240})[\\/](?:windows)?powershell)[\\/]+(?:microsoft\.[a-z.]{1,40}_)?profile\.ps1)(?:\\?["'']|[\s;|)]|$))'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Requested shell setup, such as adding a module import or alias, writes the profile in the same way.'
+    - 'Quoted command examples can match without changing the profile.'
+    - 'PowerShell -WhatIf previews match like the real command; the regex cannot exclude the switch.'
+level: medium
+telltale:
+    category: persistence
+    score: 45
+    explanation: 'An agent tool call writes, appends to, or replaces a PowerShell profile script, which runs in every later PowerShell session of that user or host.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [windows, persistence, powershell, profile]

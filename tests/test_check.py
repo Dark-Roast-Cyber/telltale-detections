@@ -46,39 +46,42 @@ class CheckCliTests(unittest.TestCase):
              "result": {"status": "ok", "exit_code": 0, "output": "TELLTALE_TEST_MARKER"}},
         ]
         baseline["rule_expectations"] = {"must_match": ["tdx.test.marker"], "must_not_match": []}
-        pack = """version: 1
-description: Synthetic runner test rule.
-defaults:
-  case_insensitive: true
-  enabled: true
-rules:
-  - id: tdx.test.marker
-    status: experimental
+        rule = """title: Synthetic marker observation
+id: 3f8b6a52-0c1e-4d7a-9b2f-5e6d7c8a9b01
+name: tdx.test.marker
+taxonomy: telltale
+status: experimental
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern 'TELLTALE_TEST_MARKER'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - Authorized marker tests.
+level: low
+telltale:
     category: execution
-    severity: low
     score: 15
-    targets: [command, arguments]
-    regex: 'TELLTALE_TEST_MARKER'
-    tags: [test]
     explanation: Synthetic marker in an agent tool request.
-    falsepositives: [Authorized marker tests.]
-modifiers: []
+    tags: [test]
 """
         with tempfile.TemporaryDirectory() as tmp:
             content = Path(tmp) / "content"
             (content / "scripts").mkdir(parents=True)
             (content / "scenarios" / "adversarial").mkdir(parents=True)
-            (content / "packs" / "experimental").mkdir(parents=True)
-            (content / "packs" / "test").mkdir()
+            (content / "rules").mkdir()
             for name in ("scripts/check.py", "scripts/community_package.py",
                          "pins.json", "community-package.json"):
                 shutil.copyfile(ROOT / name, content / name)
             (content / "scenarios" / "adversarial" / "test.marker.json").write_text(json.dumps(baseline))
-            (content / "packs" / "experimental" / "marker.yaml").write_text(pack)
-            companion = pack.replace("tdx.test.marker", "tdx.test.companion").replace(
+            (content / "rules" / "tdx_test_marker.yml").write_text(rule)
+            companion = rule.replace("tdx.test.marker", "tdx.test.companion").replace(
                 "status: experimental", "status: test"
-            )
-            (content / "packs" / "test" / "companion.yaml").write_text(companion)
+            ).replace("3f8b6a52-0c1e-4d7a-9b2f-5e6d7c8a9b01", "3f8b6a52-0c1e-4d7a-9b2f-5e6d7c8a9b02")
+            (content / "rules" / "tdx_test_companion.yml").write_text(companion)
             out = Path(tmp) / "output"
             result = subprocess.run(
                 [sys.executable, str(content / "scripts" / "check.py"),
@@ -109,8 +112,8 @@ modifiers: []
 
             # A missed expectation remains a finding in the report. It does not
             # cause the runner to relabel the independently authored scenario.
-            (content / "packs" / "experimental" / "marker.yaml").write_text(
-                pack.replace("regex: 'TELLTALE_TEST_MARKER'", "regex: 'NEVER_MATCH_MARKER'")
+            (content / "rules" / "tdx_test_marker.yml").write_text(
+                rule.replace("&pattern 'TELLTALE_TEST_MARKER'", "&pattern 'NEVER_MATCH_MARKER'")
             )
             missed_out = Path(tmp) / "missed-output"
             missed = subprocess.run(

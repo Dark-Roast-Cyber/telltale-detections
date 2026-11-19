@@ -2,14 +2,14 @@
 
 This file tracks Telltale core and community rule coverage against MITRE ATLAS for agentic coding detections. ATLAS is documentation and analyst context only. Runtime scans, validation, and tests must not fetch ATLAS data.
 
-Use this file with `atlas_tags` in rule YAML:
+Use this file with ATLAS tags in Rule v2 `tags`:
 
 ```yaml
-atlas_tags:
-  - atlas:AML.T0051
+tags:
+    - atlas.aml.t0051
 ```
 
-The rule engine validates tag shape (`atlas:<id>`) but does not verify the ID against the internet or a runtime feed. When precise ATLAS context matters, look the ID up in the published [ATLAS data](https://github.com/mitre-atlas/atlas-data) while authoring, and follow Telltale's [threat taxonomy](https://github.com/Dark-Roast-Cyber/telltale/blob/main/docs/threat-taxonomy.md) for ADR categories.
+The rule engine validates tag shape (`atlas.<id>`, emitted as `atlas:<ID>`) but does not verify the ID against the internet or a runtime feed. When precise ATLAS context matters, look the ID up in the published [ATLAS data](https://github.com/mitre-atlas/atlas-data) while authoring, and follow Telltale's [threat taxonomy](https://github.com/Dark-Roast-Cyber/telltale/blob/main/docs/threat-taxonomy.md) for ADR categories.
 
 ## Metadata Contract
 
@@ -19,7 +19,7 @@ All Telltale rules use the same rule structure, regardless of purpose:
 - `detection_class`: why the rule exists, such as `security_detection`, `threat_hunting`, or `policy_violation`.
 - `signal_type`: analytic shape, such as `atomic`, `chain`, or `correlation`.
 - `analytic_intent`: how analysts should treat the event, such as `alert`, `hunt`, `audit`, `enrich`, or `baseline`.
-- `atlas_tags`: optional ATLAS context tags.
+- `tags`: optional ATLAS context tags such as `atlas.aml.t0051`.
 
 Policy violations, bleeding-edge ad-hoc hunts, and production alerts are all normal Telltale rules. They may live in separate bundles for organizational clarity, but they use the same syntax, validation, fixture expectations, scoring, redaction, and event schema.
 
@@ -72,7 +72,7 @@ These techniques are not automatically emitted by current bundled rules. They id
 
 ## Coverage Table
 
-The table covers Telltale's core Rule v1 pack in [`config/rules/tool-call-regex.yaml`](https://github.com/Dark-Roast-Cyber/telltale/blob/main/config/rules/tool-call-regex.yaml), its chain modifiers, Telltale's [example rules](https://github.com/Dark-Roast-Cyber/telltale/blob/main/config/rules/), and the community rules in this repository. It does not inventory the bundled process-chain pack. The ATLAS Tags column reflects that Rule v1 YAML as shipped today. Rules without `atlas_tags` are intentionally untagged. Prefer no ATLAS tag over a weak mapping.
+The table covers Telltale's core rules in [`config/rules/tool-call-regex.yaml`](https://github.com/Dark-Roast-Cyber/telltale/blob/main/config/rules/tool-call-regex.yaml), its chain modifiers, Telltale's [example rules](https://github.com/Dark-Roast-Cyber/telltale/blob/main/config/rules/), and the community rules in this repository. It does not inventory the bundled process-chain pack. The ATLAS Tags column reflects that rule YAML as shipped today. Rules without ATLAS tags are intentionally untagged. Prefer no ATLAS tag over a weak mapping.
 
 ### Telltale Core Rules (`config/rules/tool-call-regex.yaml`)
 
@@ -125,9 +125,9 @@ The table covers Telltale's core Rule v1 pack in [`config/rules/tool-call-regex.
 | `adhoc.agent_tool_exfil_phrase` | `exfiltration` | `threat_hunting` | `atomic` | `hunt` | `atlas:AML.T0086`, `atlas:AML.T0025` | Phrase hunt for agent-tool exfiltration language. It does not by itself prove tool invocation or exfiltration, so these tags are hypothesis context rather than confirmed behavior. |
 | `policy.agent_guardrail_modification` | `persistence` | `policy_violation` | `atomic` | `audit` | `atlas:AML.T0081` | Example path-reference rule; unlike bundled `persistence.agent_instruction_write`, it does not distinguish reads from modifications. |
 
-### Community Rules (`packs/`)
+### Community Rules (`rules/`)
 
-The `tdx.*` rules in the `telltale.community` package carry no `atlas_tags` yet. Add a tag in the rule's pack and a row here only when the mapping is specific and defensible.
+The `tdx.*` rules in the `telltale.community` package carry no ATLAS tags yet. Add an `atlas.*` tag in the rule's file and a row here only when the mapping is specific and defensible.
 
 ## Coverage Summary
 
@@ -136,15 +136,15 @@ Current shipped/example rule metadata remains:
 - Bundled rules: 25 (17 with ATLAS tags, 8 intentionally untagged)
 - Bundled chain modifiers: 9 (5 with ATLAS tags, 4 intentionally untagged)
 - Example rules: 2 (2 with ATLAS tags)
-- Community rules: 6 (0 with ATLAS tags)
+- Community rules: 8 (0 with ATLAS tags)
 - Distinct ATLAS technique IDs currently emitted: 8 (`AML.T0050`, `AML.T0051`, `AML.T0025`, `AML.T0055`, `AML.T0057`, `AML.T0081`, `AML.T0084`, `AML.T0086`)
 - Distinct ATLAS tactics represented by those technique relationships: 5 (`AML.TA0005`, `AML.TA0006`, `AML.TA0008`, `AML.TA0010`, `AML.TA0013`). `AML.TA0007` is not represented by the emitted technique IDs; Defense Evasion mappings for guardrail modification and obfuscation remain future work. The example policy rule already emits `AML.T0081` for agent guardrail/configuration modification.
 
-The ATLAS 2026.09 review does not silently change rule metadata. Updating `atlas_tags` is a detection-content change and should move with the relevant rule semantics and fixtures.
+The ATLAS 2026.09 review does not silently change rule metadata. Updating ATLAS tags is a detection-content change and should move with the relevant rule semantics and fixtures.
 
 ## Open Mapping Work
 
-Rules without `atlas_tags` are not automatically deficient. Prefer no ATLAS tag over a weak mapping. Add tags only when the relationship is specific and defensible, and keep this reference aligned with the published rule set.
+Rules without ATLAS tags are not automatically deficient. Prefer no ATLAS tag over a weak mapping. Add tags only when the relationship is specific and defensible, and keep this reference aligned with the published rule set.
 
 Highest-value mapping/convergence work:
 

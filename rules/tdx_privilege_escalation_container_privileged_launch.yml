@@ -1,0 +1,37 @@
+title: Privileged or socket-mounted container launched by an agent
+id: f4a2818b-c0b0-4e0b-8ecb-a8873a5223b7
+name: tdx.privilege_escalation.container_privileged_launch
+taxonomy: telltale
+status: experimental
+description: 'A hunt for agent shell tool requests that start a container with privileged mode, host PID mode, broad capabilities, relaxed confinement, or the Docker socket mounted, on a local or remote daemon, and for curl requests to the Docker socket. These are host-access prerequisites; a match does not prove that a container started or that isolation was bypassed.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.privilege_escalation.container_privileged_launch.md
+    - https://docs.docker.com/reference/cli/docker/container/run/
+    - https://docs.docker.com/engine/security/protect-access/
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/issues/7
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.privilege_escalation.container_host_escape.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-11-03
+modified: 2026-11-18
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(?:\b(?:docker|podman|nerdctl)\b(?:\s+-[\w-]+(?:[=\s]+[^\s;&|-][^\s;&|]*)?){0,8}(?:\s+container)?\s+(?:run|create)\b(?:[^;&|\n]|\\\r?\n){0,600}?\s(?:--privileged\b|--pid(?:\s+|=)\\{0,7}[\"'']?host\b|--cap-add(?:\s+|=)(?:cap_)?(?:sys_admin|all)\b|--security-opt(?:\s+|=)\\{0,7}[\"'']?(?:seccomp|apparmor)[=:]unconfined|(?:-v|--volume|--mount)(?:\s+|=)[^\s;&|]*docker\.sock)|\bcurl\b(?:[^;&|\n]|\\\r?\n){0,200}?--unix-socket(?:\s+|=)\\{0,7}[\"'']?[^\s;&|]*docker\.sock)'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Docker-in-Docker, KinD, and testcontainers setups routinely mount the Docker socket or run privileged.'
+    - 'Hardware, eBPF, and profiling work often needs privileged containers or added capabilities.'
+    - 'Scripts that query the Docker API socket for container status match without creating anything.'
+level: low
+telltale:
+    category: privilege_escalation
+    score: 20
+    explanation: 'An agent tool request specifies privileged container options, broad capabilities, relaxed confinement, or a daemon-socket mount, on a local or remote daemon, or makes a curl request to the Docker socket. The command is a host-access prerequisite, not evidence that the container was created or that isolation was bypassed.'
+    analytic_intent: hunt
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [container, docker, privileged, docker-socket, privilege-escalation]

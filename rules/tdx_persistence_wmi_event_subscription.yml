@@ -1,0 +1,33 @@
+title: WMI permanent event subscription created in an agent tool call
+id: 77dc6c07-34e3-49ac-bbcb-8767f4265496
+name: tdx.persistence.wmi_event_subscription
+taxonomy: telltale
+status: test
+description: 'Detects creation of a WMI permanent event subscription requested through an agent tool call: an event filter, a command-line or script consumer, or a filter-to-consumer binding, which can run a command on a system event without a logon. A match proves the request, not that WMI stored the instance.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.persistence.wmi_event_subscription.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-10-28
+modified: 2026-10-28
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(\b(?:set-wmiinstance|new-ciminstance)\b(?:[^|;&\r\n]{0,400}?(?:@\{[^}\r\n]{0,400}\}[^|;&\r\n]{0,200}?)?\s-class(?:name)?[:\s]+|\s+)\\?["'']?(?:__eventfilter|commandlineeventconsumer|activescripteventconsumer|__filtertoconsumerbinding)\b|\[wmiclass\][^|;&\r\n]{0,200}?(?:__eventfilter|commandlineeventconsumer|activescripteventconsumer|__filtertoconsumerbinding)[^|;&\r\n]{0,120}?\.createinstance\b|\bwmic\b[^|;&\r\n]{0,400}?(?:__eventfilter|commandlineeventconsumer|activescripteventconsumer|__filtertoconsumerbinding)\\?["'']?\s+create\b)'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Endpoint management and monitoring software can register WMI event subscriptions with administrator approval.'
+    - 'Quoted command examples can match without creating a subscription.'
+    - 'PowerShell -WhatIf previews match like the real command; the regex cannot exclude the switch.'
+level: high
+telltale:
+    category: persistence
+    score: 55
+    explanation: 'An agent tool call creates a WMI event filter, command-line or script consumer, or filter-to-consumer binding, which can run a command on a system event without a logon.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [windows, persistence, wmi, powershell]

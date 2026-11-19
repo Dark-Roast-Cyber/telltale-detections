@@ -4,12 +4,12 @@
 
 ## Checklist
 
-- [ ] Rule IDs use `tdx.` and each rule's `status` matches its `packs/<maturity>/` directory
+- [ ] Rule v2 files at `rules/<name>.yml` with `tdx.` names, a UUIDv4 `id`, and `status` set
 - [ ] Adversarial scenario that must match and benign look-alike that must not match
-- [ ] Analyst note at `docs/detections/<rule-id>.md`, including false positives and gaps
+- [ ] Analyst note at `docs/detections/<name>.md`, with false positives, category-level coverage limits, and changes
 - [ ] Synthetic data only: fabricated secrets, reserved hosts, no real sessions
 - [ ] Labels were written from the scenario facts, not from detector output
-- [ ] `python3 scripts/community_package.py lint` and `python3 -m unittest discover -s tests` pass
+- [ ] `python3 scripts/community_package.py lint --telltale <binary>` and `python3 -m unittest discover -s tests` pass
 - [ ] Commits are signed off (`git commit -s`)
 
 ## Assessment

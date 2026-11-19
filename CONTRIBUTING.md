@@ -4,26 +4,29 @@ Community rules ship to every Telltale user by default once they reach `test`
 maturity, so each contribution carries its own evidence. A pull request that
 adds or changes a rule includes:
 
-1. **A pack** at `packs/experimental/<name>.yaml`. Start the file with
-   `version: 1`. Use rule IDs `tdx.<category>.<behavior>` and set
-   `status: experimental` on each rule. Write `rules:` as a block list: each
-   rule starts with `  - id: tdx.…` and its fields are `    key: value` lines.
-   Keep each quoted value and each `[...]` list on one line, and do not use
-   YAML anchors, aliases, or tags; the lint rejects layouts it cannot read
-   exactly.
-   Follow Telltale's
+1. **A rule** at `rules/<name>.yml`, where `<name>` is the rule's `name` with
+   `.` replaced by `_`: one [Rule v2](https://github.com/Dark-Roast-Cyber/telltale/blob/main/docs/rule-format.md) document, Telltale's Sigma
+   profile. Use a name `tdx.<category>.<behavior>` and a fresh UUIDv4 `id`,
+   generated once and never changed, and set `status: experimental`. Give a
+   plain-text `description`, `references` that start with the rule's analyst
+   note on `main` (`https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/<name>.md`),
+   `author`, `license: Apache-2.0`, `date` and, after a change, `modified`.
+   Tag ATLAS techniques as `atlas.*` and ATT&CK techniques as `attack.t*` only
+   when the mapping is specific and defensible. YAML anchors are fine. Follow
+   Telltale's
    [detection content standard](https://github.com/Dark-Roast-Cyber/telltale/blob/main/docs/detection-content-standard.md)
-   for category, severity, score, `explanation`, and `falsepositives`. Packs
-   define rules only and end with `modifiers: []`: a chain modifier could raise
-   scores on core findings for every user, so community modifiers are not
-   accepted yet.
+   for `telltale.category`, `level`, `telltale.score`, `telltale.explanation`,
+   and `falsepositives`. Files define rules only: a chain could raise scores
+   on core findings for every user, so community chains are not accepted yet.
 2. **Scenarios** under `scenarios/`: at least one `adversarial/` scenario whose
    `rule_expectations.must_match` names the rule, at least one `benign/`
    look-alike whose `must_not_match` names it, and, where relevant, a
    `visibility-limited/` case for evidence the rule cannot see.
-3. **An analyst note** at `docs/detections/<rule-id>.md`: what the rule matches,
+3. **An analyst note** at `docs/detections/<name>.md`: what the rule matches,
    which fields it reads, how it differs from Telltale core rules, expected false
-   positives, and what it does not cover.
+   positives, a `## Coverage limits` section, and a dated `## Changes` list.
+   Describe coverage limits by category only; report specific misses privately
+   (see below).
 
 Copy an existing rule, its scenarios, and its note as a template.
 
@@ -42,20 +45,28 @@ Copy an existing rule, its scenarios, and its note as a template.
   Never change a label to make a result pass; a `missed`, `false_positive`, or
   `not_evaluable` result is a finding to fix in the rule or record in the note.
 - **Display text is plain.** Titles, descriptions, explanations, tags, and
-  false-positive notes reach SIEMs and analyst tools: no markup, links, or
-  escapes in double-quoted text (use `references` for links). No pack or
-  scenario may contain control or invisible formatting characters.
+  false-positive notes reach SIEMs and analyst tools: no markup or links (use
+  `references` for links). No rule or scenario may contain control or invisible
+  formatting characters.
+- **False positives in public, misses in private.** Report a false positive in a
+  public issue or a pull request with a benign scenario. Report a miss, a way
+  past a shipped rule, privately through Telltale's
+  [security policy](https://github.com/Dark-Roast-Cyber/telltale/blob/main/SECURITY.md),
+  not in a public issue, pull request, scenario, or note.
 
 ## Check locally
 
 ```sh
-python3 scripts/community_package.py lint
-python3 -m unittest discover -s tests
+python3 scripts/community_package.py lint --telltale <binary>
+TELLTALE_BIN=<binary> python3 -m unittest discover -s tests
 ```
 
-These need only Python. With a Telltale binary built at the `pins.json`
-revision, `python3 scripts/community_package.py validate --telltale <binary>`
-also confirms that Telltale loads every candidate pack. The
+`<binary>` is a Telltale built at the `pins.json` revision; the lint reads each
+rule through it and checks the rule catalog it prints. Rule v2 and the v2
+community package need Telltale 0.8.0 or later. Without `TELLTALE_BIN`, the
+tests that load rules in Telltale are skipped and the rest need only Python.
+`python3 scripts/community_package.py validate --telltale <binary>` also
+confirms that Telltale loads every candidate rule from the composed package. The
 [full gate](README.md#linux-assessment) needs Telltale and lab checkouts at the
 revisions in `pins.json`.
 
@@ -64,8 +75,7 @@ the assessment report, including `summary.json`.
 
 ## Maturity
 
-- **experimental → test:** move the pack to `packs/test/` and set
-  `status: test`. In the PR, cite the assessment: every adversarial scenario is
+- **experimental → test:** set `status: test`. In the PR, cite the assessment: every adversarial scenario is
   `detected` and every benign look-alike is `clean` in each format Telltale can
   evaluate at the pinned revision, with acquisition gaps listed.
 - **test → stable:** at least one release cycle with no open false-positive

@@ -1,6 +1,6 @@
 # `tdx.persistence.windows_service_change`
 
-This candidate detects Windows service persistence requested through an agent tool call: `New-Service` with a `-Name` or `-BinaryPathName` argument, `sc.exe create` or `sc.exe config` (including a quoted path to `sc.exe`) with `binPath=` or an automatic `start=` value, quoted or not, and `Set-Service` with `-StartupType Automatic` (including `AutomaticDelayedStart`). It evaluates the Rule v1 `command` and `arguments` fields. Those fields prove that the agent requested the change; they do not prove that the service controller accepted it or that the service ran.
+This candidate detects Windows service persistence requested through an agent tool call: `New-Service` with a `-Name` or `-BinaryPathName` argument, `sc.exe create` or `sc.exe config` (including a quoted path to `sc.exe`) with `binPath=` or an automatic `start=` value, quoted or not, and `Set-Service` with `-StartupType Automatic` (including `AutomaticDelayedStart`). It reads the `tool.command` and `tool.arguments` fields. Those fields prove that the agent requested the change; they do not prove that the service controller accepted it or that the service ran.
 
 Telltale core rules have no Windows service rule. The process-chain pack infers service creation from command text and is a separate opt-in; this rule does not depend on it. `tdx.persistence.windows_agent_command` covers scheduled tasks, autorun keys, and the Startup folder, so a single command does not match both rules.
 
@@ -8,4 +8,13 @@ The rule needs service arguments, not only a cmdlet name: `Get-Help New-Service`
 
 At the pinned revisions, both Codex `compatible` and OpenCode `upstream` record `detected` for `detection.windows_service_create` (`sc.exe create` with `binPath=` and `start= auto`) and `clean` for `detection.windows_requested_service_disable`, `detection.windows_persistence_read_only_audit`, and `detection.windows_persistence_docs_search`. The `New-Service` and `Set-Service` forms are covered by pattern tests only.
 
-Expected false positives are requested software installs and administration that create a service or enable automatic start, quoted command examples that include service arguments, and `-WhatIf` previews, which Rule v1 regexes cannot exclude. Not covered: service creation through the registry (`HKLM\SYSTEM\CurrentControlSet\Services`), installers, `InstallUtil`, `New-CimInstance Win32_Service`, scripts whose contents are not in the searchable arguments, and `sc config` changes to the service account or failure actions.
+Expected false positives are requested software installs and administration that create a service or enable automatic start, quoted command examples that include service arguments, and `-WhatIf` previews, which the rule's pattern cannot exclude.
+
+## Coverage limits
+
+Coverage is limited to the service commands above as they appear in `tool.command` and `tool.arguments`. Service changes made through other administration interfaces, installers or scripts whose content is not in those fields, other service settings, and indirect command construction are out of scope for this rule.
+
+## Changes
+
+- 2026-10-28: Added at `test` maturity; argument windows and ends tightened after review.
+- 2026-11-18: Converted to Rule v2, Telltale's Sigma profile, with no change in behaviour.

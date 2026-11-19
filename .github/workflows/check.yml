@@ -16,20 +16,18 @@ concurrency:
 
 jobs:
   lint:
-    name: Contribution lint and unit tests
+    # The contribution lint reads rules through the pinned Telltale, so it
+    # runs in the assess job; tests that need Telltale are skipped here.
+    name: Unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-      - name: Contribution lint
-        run: python3 scripts/community_package.py lint
       - name: Unit tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python3 -m unittest discover -s tests -v
-      - name: Build the release package
-        run: python3 scripts/community_package.py build --version 0.0.0-check --out "$RUNNER_TEMP/dist"
 
   assess:
     name: Validate and assess candidates with pinned Telltale
@@ -70,9 +68,14 @@ jobs:
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/telltale-target
         run: cargo build --release --locked --bin telltale
-      - name: Validate candidate packs with pinned Telltale
+      - name: Lint and validate candidate rules with pinned Telltale
         working-directory: telltale-detections
         run: python3 scripts/community_package.py validate --telltale "$RUNNER_TEMP/telltale-target/release/telltale"
+      - name: Build the release package
+        working-directory: telltale-detections
+        run: |
+          python3 scripts/community_package.py build --telltale "$RUNNER_TEMP/telltale-target/release/telltale" \
+            --version 0.0.0-check --out "$RUNNER_TEMP/dist"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: Dark-Roast-Cyber/telltale-lab

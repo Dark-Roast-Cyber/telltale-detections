@@ -3,7 +3,7 @@
 
 Only the lab's `scenarios` and `analyze` commands are used. `analyze` generates
 source-native session records and invokes Telltale's read-only scan of them.
-Candidate packs at every maturity are installed together as the community rule
+Candidate rules at every maturity are installed together as the community rule
 package, replacing the snapshot embedded in the pinned Telltale.
 """
 
@@ -75,7 +75,7 @@ def git_revision(path: Path) -> str | None:
 
 def install_candidate_package(telltale: Path, config_dir: Path,
                               rules: list[Path]) -> tuple[list[str], str | None, dict[str, str]]:
-    """Return lab config arguments, the package digest, and per-rule maturity."""
+    """Return lab config arguments, the package digest, and per-rule status."""
     if not rules:
         return [], None, {}
     path, maturities = community_package.install_candidate(ROOT, telltale, config_dir)
@@ -117,7 +117,7 @@ def check(args: argparse.Namespace) -> int:
     cases = files_under(lab_scenarios, ".json") + files_under(candidate_scenarios, ".json")
     if not cases:
         raise CheckError("no scenarios found")
-    rules = [path for _, path in community_package.pack_paths(ROOT)]
+    rules = community_package.rule_paths(ROOT)
 
     out.mkdir(parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -177,11 +177,11 @@ def check(args: argparse.Namespace) -> int:
             print(f"{case_id:48} {source_id:16} {status}")
 
     summary = {
-        "format": "telltale-detections/check/v1",
+        "format": "telltale-detections/check/v2",
         "telltale_source": rev.stdout.strip(),
         "telltale_version": version,
         "telltale_lab_revision": lab_revision,
-        "rule_packs": [{"name": path.relative_to(ROOT).as_posix(), "sha256": sha256(path)}
+        "rule_files": [{"name": path.relative_to(ROOT).as_posix(), "sha256": sha256(path)}
                        for path in rules],
         "candidate_package_sha256": package_sha256,
         "rule_maturities": rule_maturities,
