@@ -7,7 +7,7 @@ This **experimental alert** identifies an agent tool request for container-media
 - `nsenter` targeting PID 1.
 - A Docker Engine API `containers/create` request whose body sets `Privileged` to true or binds the host root through `Binds` or `Mounts`. The request can go over the Unix socket or an `http(s)` endpoint, from curl, wget, a Python one-liner or PowerShell.
 
-It evaluates Rule v1 `command` and `arguments`, severity high, score 50.
+It reads `tool.command` and `tool.arguments`, severity high, score 50.
 
 ## Evidence and rationale
 
@@ -30,7 +30,7 @@ The companion hunt rule identifies preconditions such as `--privileged` or a soc
 
 ## Validation and visibility
 
-The independent scenarios include a published Docker Desktop virtiofs request, Linux host-root bind mount, a correctly shaped Docker API create request, the documented Testcontainers Ryuk daemon socket launch, a Prometheus host-monitoring false-positive case, and read-only documentation search. A native Compose file write is intentionally `not_evaluable` because `command` and `arguments` do not guarantee native write-content visibility.
+The independent scenarios include a published Docker Desktop virtiofs request, Linux host-root bind mount, a correctly shaped Docker API create request, the documented Testcontainers Ryuk daemon socket launch, a Prometheus host-monitoring false-positive case, and read-only documentation search. A native Compose file write is intentionally `not_evaluable` because `tool.command` and `tool.arguments` do not guarantee native write-content visibility.
 
 The remote-daemon scenarios are two attacks and their benign twins:
 - **Attack:** a TCP Engine API probe followed by a privileged host-root create.
@@ -38,6 +38,16 @@ The remote-daemon scenarios are two attacks and their benign twins:
 - **Benign twin:** a requested read-only container listing over TCP.
 - **Benign twin:** a requested remote test run that binds only the workspace.
 
-Coverage is limited to the direct command forms listed above, as they appear in `command` and `arguments`, with the API endpoint and the create body in the same shell segment. Other container orchestration paths, other daemon transports, and indirect command or request construction are out of scope for this rule. No live escape or host filesystem operation is executed by the scenarios.
+No live escape or host filesystem operation is executed by the scenarios.
 
 See [fixture provenance](container-fixture-provenance.md) for source-to-command mapping and platform assumptions. See [issue #7](https://github.com/Dark-Roast-Cyber/telltale-detections/issues/7) for research, synthetic engine replay, and pinned-gate history.
+
+## Coverage limits
+
+Coverage is limited to the direct command forms listed above, as they appear in `tool.command` and `tool.arguments`, with the API endpoint and the create body in the same shell segment. Other container orchestration paths, other daemon transports, and indirect command or request construction are out of scope for this rule.
+
+## Changes
+
+- 2026-11-03: Added as an experimental rule.
+- 2026-11-18: Covered remote daemons and Engine API create requests over HTTP.
+- 2026-11-18: Converted to Rule v2, Telltale's Sigma profile, with no change in behaviour.

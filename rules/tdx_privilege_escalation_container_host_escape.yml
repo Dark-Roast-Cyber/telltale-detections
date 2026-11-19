@@ -1,0 +1,47 @@
+title: Agent command requests container-mediated host filesystem or namespace access
+id: 50fc7ba7-2455-4397-b3e6-aef8b284d2cf
+name: tdx.privilege_escalation.container_host_escape
+taxonomy: telltale
+status: experimental
+description: 'Identifies an agent tool request for container-mediated host access: a virtiofs mount, a docker, podman or nerdctl run or create with the host root bind-mounted on a local or remote daemon, nsenter targeting PID 1, or a Docker Engine API container create request whose body sets privileged mode or binds the host root. A match is a candidate host-access request, not a confirmed sandbox escape.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.privilege_escalation.container_host_escape.md
+    - https://docs.docker.com/engine/storage/bind-mounts/
+    - https://docs.docker.com/engine/security/protect-access/
+    - https://docs.docker.com/reference/cli/docker/container/run/
+    - https://www.pillar.security/blog/one-docker-socket-to-rule-them-all-escaping-codex-cursor-and-gemini-clis-sandboxes
+    - https://github.com/cursor/cursor/security/advisories/GHSA-v4xv-rqh3-w9mc
+    - https://profero.io/blog/the-rootkit-built-into-grok-bot/
+    - https://docs.docker.com/engine/daemon/remote-access/
+    - https://docs.docker.com/reference/cli/docker/
+    - https://docs.podman.io/en/latest/markdown/podman.1.html
+    - https://docs.docker.com/reference/api/engine/version/v1.47/
+    - https://github.com/prometheus/node_exporter#docker
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/container-fixture-provenance.md
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/issues/7
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-11-03
+modified: 2026-11-18
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(?:\bmount\b(?:[^;&|\n]|\\\r?\n){0,120}?\s-t\s*virtiofs\s+[^\s;&|]+\s+[^\s;&|]|\b(?:docker|podman|nerdctl)\b(?:\s+-[\w-]+(?:[=\s]+[^\s;&|-][^\s;&|]*)?){0,8}(?:\s+container)?\s+(?:run|create)\b(?:[^;&|\n]|\\\r?\n){0,600}?(?:\s(?:-v|--volume)(?:\s+|=)\\{0,7}[\"'']?/:|\s--mount(?:\s+|=)\\{0,7}[\"'']?[^\s;&|]*?\b(?:source|src)=/(?:,|\\{0,7}[\"'']|\s|$))|\bnsenter\b(?:[^;&|\n]|\\\r?\n){0,120}?\s(?:-t\s*1|--target(?:\s+|=)1)(?:\s|$)|(?:--unix-socket(?:\s+|=)[^\s;&|]*docker\.sock|\bhttps?://[^\s;&|]*?/containers/create(?:[^\w./]|$))(?:[^;&|\n]|\\\r?\n){0,600}?\\{0,7}[\"''](?:privileged\\{0,7}[\"'']\s*:\s*true|(?:binds\\{0,7}[\"'']\s*:\s*\[|source\\{0,7}[\"'']\s*:)\s*\\{0,7}[\"'']/(?::|\\{0,7}[\"'']))|\\{0,7}[\"''](?:privileged\\{0,7}[\"'']\s*:\s*true|(?:binds\\{0,7}[\"'']\s*:\s*\[|source\\{0,7}[\"'']\s*:)\s*\\{0,7}[\"'']/(?::|\\{0,7}[\"'']))(?:[^;&|\n]|\\\r?\n){0,600}?(?:--unix-socket(?:\s+|=)[^\s;&|]*docker\.sock|\bhttps?://[^\s;&|]*?/containers/create(?:[^\w./]|$)))'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Monitoring agents such as node-exporter or cAdvisor are commonly started with the host root mounted read-only.'
+    - 'Requested host recovery or forensics work may mount the host root into a container or use nsenter on purpose.'
+    - 'Developers working inside a VM guest may mount a virtiofs share they configured themselves.'
+    - 'Requested CI or remote host maintenance may create privileged or host-root containers on a remote daemon on purpose.'
+level: high
+telltale:
+    category: privilege_escalation
+    score: 50
+    explanation: 'An agent tool request includes a virtiofs mount, a host-root container bind on a local or remote daemon, PID 1 namespace entry, or a Docker Engine API create request, over the Unix socket or a TCP endpoint, containing privileged or host-root settings. These can enable host access when permissions and runtime configuration allow it; the command alone does not prove a sandbox escape, a successful mount, or execution.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [container, docker, sandbox-escape, privilege-escalation, host-mount]

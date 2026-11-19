@@ -1,0 +1,33 @@
+title: Windows service install or autostart change in an agent tool call
+id: 3366a104-4b3f-42c1-99ae-0133f752ff76
+name: tdx.persistence.windows_service_change
+taxonomy: telltale
+status: test
+description: 'Detects Windows service persistence requested through an agent tool call: New-Service with a name or binary path, sc.exe create or config with a binPath or automatic start value, and Set-Service with an automatic startup type. A match proves the request, not that the service controller accepted it or that the service ran.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.persistence.windows_service_change.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-10-28
+modified: 2026-10-28
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(\bnew-service\b[^|;&\r\n]{0,400}?\s-(?:name|binarypathname)\b|\bset-service\b[^|;&\r\n]{0,400}?\s-startuptype[:\s]+\\?["'']?automatic|\bsc(?:\.exe)?\\?["'']?\s+(?:\\\\\S+\s+)?(?:create|config)\s+\S+[^|;&\r\n]{0,400}?\b(?:binpath\s*=|start\s*=\s*\\?["'']?(?:auto|delayed-auto)\b))'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Authorized administration and requested software installs can create services or enable automatic start.'
+    - 'Quoted command examples with service arguments can match without changing a service.'
+    - 'PowerShell -WhatIf previews match like the real command; the regex cannot exclude the switch.'
+level: high
+telltale:
+    category: persistence
+    score: 55
+    explanation: 'An agent tool call creates a Windows service, points an existing service at a new binary, or sets a service to start automatically.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [windows, persistence, service, powershell]

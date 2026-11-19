@@ -30,7 +30,7 @@ export TELLTALE_BIN="$BINARY"
 export TELLTALE_LAB_ROOT="$LAB_ROOT"
 export TELLTALE_SOURCE
 
-python3 "$DETECTIONS_ROOT/scripts/community_package.py" lint
+python3 "$DETECTIONS_ROOT/scripts/community_package.py" lint --telltale "$BINARY"
 # The lab's own characterization tests run in the lab repository; this gate
 # uses only the lab's `scenarios` and `analyze` commands at the pinned revision.
 python3 -m unittest discover -s "$DETECTIONS_ROOT/tests" -v

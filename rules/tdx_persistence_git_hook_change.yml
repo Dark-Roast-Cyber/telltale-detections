@@ -1,0 +1,37 @@
+title: Git hook path or hook program changed by an agent
+id: df8e8e98-fdc2-4a5b-af57-9d170c0b3f2e
+name: tdx.persistence.git_hook_change
+taxonomy: telltale
+status: test
+description: 'Detects an agent setting core.hooksPath, tool arguments that contain both a .git/hooks path and a shebang marker within 400 characters, and a file write whose target is a hook under .git/hooks other than a .sample file. A match proves only that the recorded tool request contained the configuration pattern, nearby hook-path and shebang text, or a hook write target, not that a hook was written or later executed.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.persistence.git_hook_change.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-10-13
+modified: 2026-11-18
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(git[ \t]+config(?:[ \t]+--(?:local|global|system|add|replace-all))*[ \t]+core\.hooksPath[ \t]+[^\s;&|<>#)]+|(?s:(\.git[\\/]hooks[\\/][A-Za-z0-9._-]+.{0,400}#!|#!.{0,400}\.git[\\/]hooks[\\/][A-Za-z0-9._-]+)))'
+        - tool.arguments|re|i: *pattern
+    selection_written_path:
+        tool.written_path|re|i: '(^|[\\/])\.git[\\/]hooks[\\/][A-Za-z0-9._-]+$'
+    filter_written_path:
+        tool.written_path|endswith: '.sample'
+    condition: selection or (selection_written_path and not filter_written_path)
+falsepositives:
+    - 'Authorized repository setup may install versioned hooks or configure a team-approved hooks directory.'
+    - 'Hook framework installation may create executable hook shims as part of an explicitly requested developer setup.'
+    - 'Read-only shebang inspection and quoted hook examples can contain the same hook-path and shebang text.'
+level: high
+telltale:
+    category: persistence
+    score: 50
+    explanation: 'An agent tool request contains a hook configuration pattern or nearby hook-path and shebang text, or requests a write to a Git hook file; a completed write or later hook execution requires confirmation.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [git, hooks, persistence, repository]

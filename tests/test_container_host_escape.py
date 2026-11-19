@@ -9,16 +9,18 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PACK = ROOT / "packs/experimental/container-host-escape.yaml"
 REMOTE = "docker-host.invalid"
+SELECTION = "        - tool.command|re|i: &pattern '"
 
 
-def pattern(rule_id: str) -> re.Pattern[str]:
-    lines = PACK.read_text(encoding="utf-8").splitlines()
-    lines = lines[lines.index(f"  - id: {rule_id}"):]
-    line = next(value for value in lines if value.startswith("    regex: "))
-    assert line.startswith("    regex: '") and line.endswith("'")
-    return re.compile(line[len("    regex: '"):-1].replace("''", "'"), re.IGNORECASE)
+def pattern(name: str) -> re.Pattern[str]:
+    # Each rule reads one case-insensitive pattern from `tool.command` and,
+    # through the alias, `tool.arguments`.
+    path = ROOT / "rules" / (name.replace(".", "_") + ".yml")
+    lines = path.read_text(encoding="utf-8").splitlines()
+    index = next(index for index, line in enumerate(lines) if line.startswith(SELECTION))
+    assert lines[index].endswith("'") and lines[index + 1] == "        - tool.arguments|re|i: *pattern"
+    return re.compile(lines[index][len(SELECTION):-1].replace("''", "'"), re.IGNORECASE)
 
 
 class ContainerHostAccessTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-"""Focused command confounders for the shipped Rule v1 regexes.
+"""Focused command confounders for the shipped Rule v2 regular expressions.
 
 These are fast pattern checks, not a substitute for the pinned parser-to-event gate.
 """
@@ -9,22 +9,22 @@ import unittest
 from pathlib import Path
 
 
-PACKS = Path(__file__).resolve().parents[1] / "packs" / "test"
+RULES = Path(__file__).resolve().parents[1] / "rules"
+SELECTION = "        - tool.command|re|i: &pattern '"
 
 
-def pattern(pack: str, rule_id: str | None = None) -> re.Pattern[str]:
-    # Contribution lint requires one single-quoted regex on one line per rule.
-    lines = (PACKS / pack).read_text(encoding="utf-8").splitlines()
-    if rule_id is not None:
-        lines = lines[lines.index(f"  - id: {rule_id}") :]
-    line = next(line for line in lines if line.startswith("    regex: "))
-    assert line.startswith("    regex: '") and line.endswith("'")
-    return re.compile(line[len("    regex: '") : -1].replace("''", "'"), re.IGNORECASE)
+def pattern(name: str) -> re.Pattern[str]:
+    # Each rule reads one case-insensitive pattern from `tool.command` and,
+    # through the alias, `tool.arguments`.
+    lines = (RULES / (name.replace(".", "_") + ".yml")).read_text(encoding="utf-8").splitlines()
+    index = next(index for index, line in enumerate(lines) if line.startswith(SELECTION))
+    assert lines[index].endswith("'") and lines[index + 1] == "        - tool.arguments|re|i: *pattern"
+    return re.compile(lines[index][len(SELECTION):-1].replace("''", "'"), re.IGNORECASE)
 
 
 class RulePatternTests(unittest.TestCase):
     def test_git_hook_change(self) -> None:
-        rule = pattern("git-hook-persistence.yaml")
+        rule = pattern("tdx.persistence.git_hook_change")
         positive = (
             "git config core.hooksPath .githooks",
             "git config --global core.hooksPath hooks",
@@ -51,8 +51,30 @@ class RulePatternTests(unittest.TestCase):
                 self.assertIsNone(rule.search(command))
                 self.assertIsNone(rule.search(json.dumps(["bash", "-lc", command])))
 
+    def test_git_hook_write_target(self) -> None:
+        line = next(line for line in (RULES / "tdx_persistence_git_hook_change.yml").read_text(
+            encoding="utf-8").splitlines() if line.startswith("        tool.written_path|re|i: '"))
+        rule = re.compile(line[len("        tool.written_path|re|i: '"):-1].replace("''", "'"), re.IGNORECASE)
+        positive = (
+            "/workspace/demo/.git/hooks/pre-commit",
+            ".git/hooks/post-checkout",
+            "C:\\repo\\.git\\hooks\\pre-push",
+        )
+        negative = (
+            "/workspace/demo/.git/hooks/",
+            "/workspace/demo/.git/hooks/pre-commit/notes.txt",
+            "/workspace/demo/.githooks/pre-commit",
+            "/workspace/demo/hooks/pre-commit",
+        )
+        for path in positive:
+            with self.subTest(path=path):
+                self.assertIsNotNone(rule.search(path))
+        for path in negative:
+            with self.subTest(path=path):
+                self.assertIsNone(rule.search(path))
+
     def test_mcp_registration(self) -> None:
-        rule = pattern("mcp-server-registration.yaml")
+        rule = pattern("tdx.persistence.mcp_server_registration")
         positive = (
             "codex mcp add helper --url http://127.0.0.1:65535/mcp",
             'codex mcp add --url=http://127.0.0.1:65535/mcp "helper"',
@@ -88,13 +110,13 @@ class RulePatternTests(unittest.TestCase):
 
     def test_known_hook_read_false_positive_remains_visible(self) -> None:
         # The independent benign scenario still reports this finding in the full gate.
-        rule = pattern("git-hook-persistence.yaml")
+        rule = pattern("tdx.persistence.git_hook_change")
         command = "grep '#!' .git/hooks/pre-commit"
         self.assertIsNotNone(rule.search(command))
         self.assertIsNotNone(rule.search(json.dumps(["bash", "-lc", command])))
 
     def test_windows_persistence(self) -> None:
-        rule = pattern("windows-agent-persistence.yaml")
+        rule = pattern("tdx.persistence.windows_agent_command")
         positive = (
             "schtasks.exe /Create /SC ONLOGON /TN SyntheticUpdater /TR example.exe",
             r"reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Example /d example.exe",
@@ -155,7 +177,7 @@ class RulePatternTests(unittest.TestCase):
         self.assert_windows_matches(rule, positive, negative)
 
     def test_windows_service_change(self) -> None:
-        rule = pattern("windows-agent-persistence.yaml", "tdx.persistence.windows_service_change")
+        rule = pattern("tdx.persistence.windows_service_change")
         positive = (
             r'New-Service -Name SyntheticSvc -BinaryPathName "C:\Example\svc.exe" -StartupType Automatic',
             r"New-Service -BinaryPathName C:\Example\svc.exe -Name SyntheticSvc",
@@ -182,7 +204,7 @@ class RulePatternTests(unittest.TestCase):
         self.assert_windows_matches(rule, positive, negative)
 
     def test_powershell_profile_write(self) -> None:
-        rule = pattern("windows-agent-persistence.yaml", "tdx.persistence.powershell_profile_write")
+        rule = pattern("tdx.persistence.powershell_profile_write")
         positive = (
             "Add-Content -Path $PROFILE -Value 'Import-Module SyntheticTools'",
             "'Import-Module SyntheticTools' | Out-File -FilePath $PROFILE -Append",
@@ -211,7 +233,7 @@ class RulePatternTests(unittest.TestCase):
         self.assert_windows_matches(rule, positive, negative)
 
     def test_wmi_event_subscription(self) -> None:
-        rule = pattern("windows-agent-persistence.yaml", "tdx.persistence.wmi_event_subscription")
+        rule = pattern("tdx.persistence.wmi_event_subscription")
         positive = (
             r"Set-WmiInstance -Namespace root\subscription -Class __EventFilter -Arguments @{Name='SyntheticFilter'; QueryLanguage='WQL'}",
             r"New-CimInstance -Namespace root/subscription -ClassName CommandLineEventConsumer -Property @{Name='SyntheticConsumer'}",

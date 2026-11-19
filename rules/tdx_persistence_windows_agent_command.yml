@@ -1,0 +1,33 @@
+title: Windows persistence command in an agent tool call
+id: 0b76df20-be7c-49e0-961a-e0f004b82225
+name: tdx.persistence.windows_agent_command
+taxonomy: telltale
+status: test
+description: 'Detects Windows scheduled-task, autorun-key and Startup-folder persistence requested through an agent tool call, in cmd tools and PowerShell cmdlets. A match proves that the agent requested the command, not that Windows accepted it or that persistence remains installed.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.persistence.windows_agent_command.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-10-13
+modified: 2026-10-28
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(schtasks(?:\.exe)?\s+.{0,200}/create\b|\b(?:register|set)-scheduledtask\b[^|;&\r\n]{0,400}?\s-(?:taskname|action|trigger|xml|inputobject)\b|(?:reg(?:\.exe)?\s+add\s+|\b(?:set|new)-itemproperty\s+(?:[^|;&\r\n]{0,240}?-(?:literal)?path:?\s*)?)(?:\\?["''])?(?:registry::)?HK(?:CU|LM|EY_(?:CURRENT_USER|LOCAL_MACHINE)):?[\\/]+Software[\\/]+Microsoft[\\/]+(?:Windows[\\/]+CurrentVersion[\\/]+(?:Run(?:Once(?:Ex(?:[\\/]+\w+)?)?)?|Policies[\\/]+Explorer[\\/]+Run)|Windows NT[\\/]+CurrentVersion[\\/]+Winlogon)(?:\\?["'']|\s|$)|(?:x?copy|move|robocopy|(?:copy|move)-item(?:\s+-(?:literal)?path)?)\s+(?:/-?Y\s+){0,2}(?:\\?["''][^"''\r\n]{1,240}["'']|[^\s"''/-][^\s"'']{0,239})\s+(?:-destination:?\s*)?(?:\\?["''][^"''\r\n]{0,240}[\\/]+Startup(?:[\\/][^"''\r\n]{0,240})?\\?["'']|[^\s"'']{0,240}[\\/]+Startup(?:[\\/][^\s"'']{0,240})?(?:\s|\\?["'']|$))|-destination[:\s]+[^|;&\r\n]{0,120}?shell:(?:common\s?)?startup\b|shell:(?:common\s?)?startup\b[^|;&\r\n]{0,120}?\.(?:copy|move)here\b)'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Authorized endpoint administration may create scheduled tasks, configure approved autorun software, or install a requested startup shortcut.'
+    - 'Quoted command examples, arbitrary folders named Startup, and ordinary Winlogon settings can match without establishing persistence.'
+    - 'PowerShell -WhatIf previews match like the real command; the regex cannot exclude the switch.'
+level: high
+telltale:
+    category: persistence
+    score: 55
+    explanation: 'An agent tool call attempts a Windows scheduled-task, autorun-key, or startup-folder persistence change through cmd tools or PowerShell cmdlets, without requiring process parent-child telemetry.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [windows, persistence, scheduled-task, run-key, startup-folder, powershell]

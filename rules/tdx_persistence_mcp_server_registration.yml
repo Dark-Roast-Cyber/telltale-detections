@@ -1,0 +1,33 @@
+title: MCP server registered by an agent command
+id: 51dcf092-f84d-4c8a-9e62-6721494bb644
+name: tdx.persistence.mcp_server_registration
+taxonomy: telltale
+status: test
+description: 'Matches named mcp add requests for Codex, Claude Code and OpenCode, and the bare opencode mcp add wizard, which durably expand the agent''s tool surface. A match identifies a requested operation, not a completed registration or a trusted server.'
+references:
+    - https://github.com/Dark-Roast-Cyber/telltale-detections/blob/main/docs/detections/tdx.persistence.mcp_server_registration.md
+author: Telltale community detections
+license: Apache-2.0
+date: 2026-10-13
+modified: 2026-11-18
+logsource:
+    product: ai_agent
+    category: tool_activity
+detection:
+    selection:
+        - tool.command|re|i: &pattern '(?:^|[\s''";&|])(?:(?:codex|claude|opencode)[ \t]+mcp[ \t]+add[ \t]+(?:(?:--client-secret|(?:--(?:bearer-token-env-var|callback-port|client-id|env|header|scope|transport|url)|-[Hest])(?:[ \t]+|=)(?:\\?[''"][^''"\r\n]*\\?[''"]|[^\s''";&|<>]+))[ \t]+)*(?:--[ \t]+)?(?:\\?[''"])?[a-z0-9_.$]|opencode[ \t]+mcp[ \t]+add[ \t]*(?:$|[;&|\r\n<>]|\\?[''"][ \t]*(?:$|[,;&|}\]\r\n<>])))'
+        - tool.arguments|re|i: *pattern
+    condition: selection
+falsepositives:
+    - 'Authorized developer setup may register an approved local or organizational MCP server.'
+    - 'Integration tests may exercise an MCP add command against a synthetic server.'
+    - 'Help requested after a server name and quoted registration examples can match without changing configuration.'
+level: medium
+telltale:
+    category: persistence
+    score: 40
+    explanation: 'An agent tool request contains a named MCP add command or the bare OpenCode registration wizard; successful registration and expansion of the tool surface require confirmation.'
+    analytic_intent: alert
+    detection_class: security_detection
+    signal_type: atomic
+    tags: [mcp, tool-surface, configuration, persistence]
